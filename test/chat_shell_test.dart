@@ -4,7 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:chat_pet_mvp/app.dart';
 import 'package:chat_pet_mvp/chat/application/media_picker_service.dart';
+import 'package:chat_pet_mvp/chat/data/fake/fake_media_upload_data_source.dart';
+import 'package:chat_pet_mvp/chat/data/fake/fake_message_event_source.dart';
+import 'package:chat_pet_mvp/chat/data/fake/fake_message_remote_data_source.dart';
+import 'package:chat_pet_mvp/chat/data/fake/fake_message_repository.dart';
+import 'package:chat_pet_mvp/chat/domain/chat_message.dart';
 import 'package:chat_pet_mvp/chat/domain/media_policy.dart';
+import 'package:chat_pet_mvp/chat/domain/message_content.dart';
+import 'package:chat_pet_mvp/chat/domain/message_status.dart';
 import 'package:chat_pet_mvp/chat/presentation/chat_providers.dart';
 import 'package:chat_pet_mvp/chat/presentation/chat_shell.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_world.dart';
@@ -63,6 +70,78 @@ void main() {
     expect(target.hasMeasuredBounds, isTrue);
     expect(target.bounds.width, greaterThan(0));
     expect(target.bounds.height, greaterThan(0));
+  });
+
+  testWidgets('server-backed bubble follows its canonical spring deflection', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const ChatPetApp());
+    await _pumpChat(tester);
+
+    final bubble = find.text('👋');
+    final controller = tester
+        .widget<PetWorldOverlay>(find.byType(PetWorldOverlay))
+        .controller;
+
+    controller.triggerBubbleImpulse('seed-f2', 180);
+    await tester.pump(const Duration(milliseconds: 16));
+
+    final deflection = controller.getBubbleDeflection('seed-f2');
+    expect(deflection, greaterThan(0));
+    expect(_bubbleTranslationY(tester, bubble), closeTo(deflection, 0.1));
+  });
+
+  testWidgets('acknowledged bubble keeps rendering its active spring', (
+    tester,
+  ) async {
+    final events = FakeMessageEventSource();
+    final repository = FakeMessageRepository(
+      remote: FakeMessageRemoteDataSource(),
+      upload: FakeMediaUploadDataSource(),
+      events: events,
+    );
+    final pending = ChatMessage(
+      clientId: 'pending-client',
+      roomId: 'friends',
+      senderId: 'You',
+      content: const MessageContent.text(text: 'acknowledgement keeps bounce'),
+      status: MessageDeliveryStatus.sending,
+      createdAt: DateTime(2026, 9, 19),
+      isMine: true,
+    );
+    repository.seedMessages([pending]);
+    addTearDown(repository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatEventSourceProvider.overrideWithValue(events),
+          chatRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: ChatShell()),
+      ),
+    );
+    await _pumpChat(tester);
+
+    final bubble = find.text('acknowledgement keeps bounce');
+    final controller = tester
+        .widget<PetWorldOverlay>(find.byType(PetWorldOverlay))
+        .controller;
+    controller.triggerBubbleImpulse('pending-client', 180);
+    await tester.pump(const Duration(milliseconds: 16));
+
+    events.emitModified(
+      pending.copyWith(
+        serverId: 'server-ack',
+        status: MessageDeliveryStatus.sent,
+      ),
+    );
+    await tester.pump();
+
+    final deflection = controller.getBubbleDeflection('server-ack');
+    expect(deflection, greaterThan(0));
+    expect(controller.getBubbleDeflection('pending-client'), 0);
+    expect(_bubbleTranslationY(tester, bubble), closeTo(deflection, 0.1));
   });
 
   testWidgets('switches between Corgi, Cat, and Parrot from AppBar capsule', (
@@ -341,4 +420,13 @@ void main() {
 Future<void> _pumpChat(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 50));
+}
+
+double _bubbleTranslationY(WidgetTester tester, Finder bubble) {
+  final transform = find
+      .ancestor(of: bubble, matching: find.byType(Transform))
+      .evaluate()
+      .map((element) => element.widget as Transform)
+      .firstWhere((transform) => transform.alignment == null);
+  return transform.transform.storage[13];
 }

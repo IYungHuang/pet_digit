@@ -674,7 +674,7 @@ class _MessageCard extends StatelessWidget {
             animation: controller.springNotifier,
             builder: (context, child) {
               final deflection = controller.getBubbleDeflection(
-                message.clientId,
+                PetMessageTargetFactory.domainMessageId(message),
               );
               final scaleY = (1.0 - (deflection / 240.0)).clamp(0.85, 1.15);
               final scaleX = (1.0 + (deflection / 340.0)).clamp(0.90, 1.15);
