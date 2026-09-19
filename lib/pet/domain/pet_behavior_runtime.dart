@@ -31,12 +31,14 @@ class PetBehaviorStimulus {
 class PetBehaviorSelection {
   const PetBehaviorSelection({
     required this.action,
+    required this.stimulusType,
     required this.targetId,
     required this.capability,
     required this.reason,
   });
 
   final PetBehaviorAction action;
+  final PetStimulusType stimulusType;
   final String targetId;
   final PetBehaviorCapability capability;
   final String reason;

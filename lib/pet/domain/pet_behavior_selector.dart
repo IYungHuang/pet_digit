@@ -42,6 +42,7 @@ class PetBehaviorSelector {
     final definition = PetBehaviorCatalog.actionDefinitions[selected.action]!;
     return PetBehaviorSelection(
       action: selected.action,
+      stimulusType: stimulus.stimulusType,
       targetId: stimulus.targetId,
       capability: definition.capability,
       reason: '${stimulus.stimulusType.name}:${selected.action.name}',

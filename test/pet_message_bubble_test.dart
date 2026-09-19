@@ -34,6 +34,10 @@ void main() {
       'image',
       'video',
     ]);
+    controller.updateObjectBounds({
+      for (final target in controller.objects)
+        target.id: const Rect.fromLTWH(10, 20, 200, 60),
+    });
 
     controller.interact('text');
     expect(controller.state, PetState.jump);

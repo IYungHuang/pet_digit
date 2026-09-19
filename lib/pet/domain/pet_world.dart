@@ -93,6 +93,20 @@ abstract interface class PetBoundedInteractable implements PetInteractable {
   void updateBounds(Rect newBounds);
 }
 
+/// Runtime commands used by catalog behavior execution.
+///
+/// Controller remains owner of animation state and effects. Executor only
+/// selects an explicit compatible runtime sequence.
+abstract interface class PetBehaviorRuntime {
+  void startJumpToPlatform(PetBoundedInteractable target);
+
+  void startChaseEmoji(PetInteractable target, {required Object? payload});
+
+  void startInspectGif(PetInteractable target, {required Object? payload});
+
+  void startObserveTarget(PetInteractable target, {required bool walkToward});
+}
+
 class MessageWorldObject implements PetBoundedInteractable {
   MessageWorldObject({
     required this.message,

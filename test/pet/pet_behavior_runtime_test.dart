@@ -9,6 +9,7 @@ void main() {
   test('selection separates catalog capability from execution status', () {
     const selection = PetBehaviorSelection(
       action: PetBehaviorAction.sniffBubble,
+      stimulusType: PetStimulusType.userTap,
       targetId: 'm1',
       capability: PetBehaviorCapability.degraded,
       reason: 'observe fallback',

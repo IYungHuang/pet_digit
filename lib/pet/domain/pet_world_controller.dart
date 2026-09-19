@@ -5,13 +5,26 @@ import 'package:flutter/foundation.dart';
 
 import '../../chat/domain/chat_models.dart';
 import '../../chat/domain/chat_message.dart' as domain;
+import 'pet_behavior_catalog.dart';
+import 'pet_behavior_executor.dart';
+import 'pet_behavior_normalizer.dart';
+import 'pet_behavior_runtime.dart';
+import 'pet_behavior_selector.dart';
 import 'pet_message_bubble.dart';
+import 'pet_message_target.dart';
+import 'pet_message_target_factory.dart';
 import 'pet_effects.dart';
 import 'pet_world.dart';
 
-enum PetActionType { none, jumpToPlatform, chaseEmoji, inspectGif }
+enum PetActionType {
+  none,
+  jumpToPlatform,
+  chaseEmoji,
+  inspectGif,
+  observeTarget,
+}
 
-class PetWorldController {
+class PetWorldController implements PetBehaviorRuntime {
   PetState state = PetState.idle;
   Offset position = const Offset(24, 24);
   List<PetInteractable> objects = const [];
@@ -105,9 +118,14 @@ class PetWorldController {
 
   // Action target
   PetInteractable? _activeTarget;
+  Object? _activePayload;
+  bool _walkTowardObservationTarget = false;
   double _actionElapsed = 0.0;
   double _dustTimer = 0.0;
   double _stepBounceTimer = 0.0;
+
+  PetInteractable? get activeTarget => _activeTarget;
+  Object? get activePayload => _activePayload;
 
   int get frameIndex {
     switch (state) {
@@ -140,6 +158,8 @@ class PetWorldController {
     currentAction = PetActionType.none;
     currentPlatform = null;
     _activeTarget = null;
+    _activePayload = null;
+    _walkTowardObservationTarget = false;
     _actionElapsed = 0.0;
     _dustTimer = 0.0;
     _stepBounceTimer = 0.0;
@@ -239,35 +259,126 @@ class PetWorldController {
       case PetActionType.inspectGif:
         _tickInspectGif(dt);
         break;
+      case PetActionType.observeTarget:
+        _tickObserveTarget(dt);
+        break;
       case PetActionType.none:
         _tickDefaultPatrol(dt);
         break;
     }
   }
 
-  void interact(String objectId) {
-    final object = objects.cast<PetInteractable?>().firstWhere(
-      (item) => item?.id == objectId,
-      orElse: () => null,
+  /// Compatibility entry point for existing tap callers.
+  PetBehaviorExecutionResult interact(String objectId) {
+    final object = _objectForId(objectId);
+    final target = object == null ? null : _normalizedTargetForObject(object);
+    if (target == null) {
+      return PetBehaviorExecutionResult(
+        status: PetBehaviorExecutionStatus.ignored,
+        action: null,
+        targetId: objectId,
+        reason: 'no normalized target for user tap',
+      );
+    }
+    return dispatch(
+      PetBehaviorNormalizer.fromTarget(
+        target,
+        PetStimulusType.userTap,
+        petType: selectedPet,
+      ),
     );
-    if (object == null) return;
+  }
 
-    _activeTarget = object;
+  /// Resolves a catalog behavior and delegates only approved runtime work.
+  PetBehaviorExecutionResult dispatch(PetBehaviorStimulus stimulus) {
+    final target = _targetForStimulus(stimulus);
+    if (target == null) {
+      return PetBehaviorExecutionResult(
+        status: PetBehaviorExecutionStatus.ignored,
+        action: null,
+        targetId: stimulus.targetId,
+        reason: 'target is unavailable',
+      );
+    }
+    final selection = const PetBehaviorSelector().select(stimulus);
+    if (selection == null) {
+      return PetBehaviorExecutionResult(
+        status: PetBehaviorExecutionStatus.ignored,
+        action: null,
+        targetId: stimulus.targetId,
+        reason: 'no selection for stimulus',
+      );
+    }
+    return PetBehaviorExecutor(this).execute(selection, target);
+  }
+
+  PetInteractable? _objectForId(String objectId) => objects
+      .cast<PetInteractable?>()
+      .firstWhere((item) => item?.id == objectId, orElse: () => null);
+
+  PetMessageTarget? _normalizedTargetForObject(PetInteractable object) {
+    if (object is PetMessageTarget) return object;
+    if (object is PetMessageBubbleTarget) {
+      return _copyTarget(object.data, object);
+    }
+    if (object is MessageWorldObject) {
+      // Legacy room targets remain supported until Task 5 collection migration.
+      final target = PetMessageTargetFactory.fromLegacyMessage(object.message);
+      target.markMeasuredBounds(object.bounds);
+      return target;
+    }
+    return null;
+  }
+
+  PetMessageTarget? _targetForStimulus(PetBehaviorStimulus stimulus) {
+    final object = _objectForId(stimulus.targetId);
+    if (object == null) return null;
+    final target = PetMessageTarget(
+      id: stimulus.targetId,
+      kind: stimulus.targetKind,
+      contentKind: stimulus.contentKind,
+      payload: stimulus.payload,
+      messageText: '${stimulus.payload}',
+    );
+    if (object is PetBoundedInteractable && object.hasMeasuredBounds) {
+      target.markMeasuredBounds(object.bounds);
+    }
+    return target;
+  }
+
+  PetMessageTarget _copyTarget(
+    PetMessageTargetData data,
+    PetInteractable object,
+  ) {
+    final target = PetMessageTarget(
+      id: data.id,
+      kind: data.kind,
+      contentKind: data.contentKind,
+      payload: data.payload,
+      messageText: data.messageText,
+    );
+    if (object is PetBoundedInteractable && object.hasMeasuredBounds) {
+      target.markMeasuredBounds(object.bounds);
+    }
+    return target;
+  }
+
+  void _beginRuntimeAction(PetInteractable target, Object? payload) {
+    _activeTarget = target;
+    _activePayload = payload;
     _actionElapsed = 0.0;
     _time = 0.0;
-    state = object.interactionFor(const PetEvent.tap());
-
-    if (object.kind == WorldObjectKind.platform &&
-        object is PetBoundedInteractable) {
-      _startJumpToPlatform(object);
-    } else if (object.kind == WorldObjectKind.emojiToy) {
-      _startChaseEmoji(object);
-    } else if (object.kind == WorldObjectKind.animatedToy) {
-      _startInspectGif(object);
-    }
+    _dustTimer = 0.0;
+    _stepBounceTimer = 0.0;
   }
 
   // --- Platform Jump (Standing/Walking on Bubble with Spring Landing) ---
+  @override
+  void startJumpToPlatform(PetBoundedInteractable target) {
+    _beginRuntimeAction(target, null);
+    _startJumpToPlatform(target);
+  }
+
   void _startJumpToPlatform(PetBoundedInteractable target) {
     // If leaving a platform, trigger push-off recoil on previous platform
     if (currentPlatform != null) {
@@ -338,7 +449,13 @@ class PetWorldController {
   }
 
   // --- Emoji Chase (Video 2: Emoji Bouncing & Corgi Chasing) ---
-  void _startChaseEmoji(PetInteractable target) {
+  @override
+  void startChaseEmoji(PetInteractable target, {required Object? payload}) {
+    _beginRuntimeAction(target, payload);
+    _startChaseEmoji(target, payload: payload);
+  }
+
+  void _startChaseEmoji(PetInteractable target, {required Object? payload}) {
     // If corgi is on platform, leave platform with recoil push-off
     if (currentPlatform != null) {
       triggerBubbleImpulse(currentPlatform!.id, 70.0);
@@ -354,7 +471,7 @@ class PetWorldController {
     final groundY = math.max(position.dy + 70, target.bounds.bottom + 40);
 
     bouncingToy = BouncingEmojiToy(
-      emoji: (target is MessageWorldObject) ? target.message.text : '👋',
+      emoji: payload is String && payload.isNotEmpty ? payload : '👋',
       start: bubbleCenter,
       groundY: groundY,
       direction: launchDirection,
@@ -410,6 +527,12 @@ class PetWorldController {
   }
 
   // --- GIF Observe (Video 1: Look up -> Hearts -> Approach -> Paw on Bubble) ---
+  @override
+  void startInspectGif(PetInteractable target, {required Object? payload}) {
+    _beginRuntimeAction(target, payload);
+    _startInspectGif(target);
+  }
+
   void _startInspectGif(PetInteractable target) {
     if (currentPlatform != null) {
       triggerBubbleImpulse(currentPlatform!.id, 60.0);
@@ -472,6 +595,49 @@ class PetWorldController {
       state = PetState.idle;
       _time = 0.0;
     }
+  }
+
+  @override
+  void startObserveTarget(PetInteractable target, {required bool walkToward}) {
+    _beginRuntimeAction(target, null);
+    currentAction = PetActionType.observeTarget;
+    _walkTowardObservationTarget = walkToward;
+    state = walkToward ? PetState.walk : PetState.observe;
+  }
+
+  void _tickObserveTarget(double dt) {
+    final target = _activeTarget;
+    if (target == null) {
+      currentAction = PetActionType.none;
+      state = PetState.idle;
+      return;
+    }
+    if (!_walkTowardObservationTarget) {
+      state = PetState.observe;
+      return;
+    }
+
+    final targetPosition = Offset(
+      target.bounds.center.dx - 32,
+      target.bounds.bottom - 52,
+    );
+    final dx = targetPosition.dx - position.dx;
+    final dy = targetPosition.dy - position.dy;
+    final distance = math.sqrt(dx * dx + dy * dy);
+    if (distance <= 12) {
+      _walkTowardObservationTarget = false;
+      state = PetState.observe;
+      return;
+    }
+
+    state = PetState.walk;
+    _walkDirection = dx >= 0 ? 1.0 : -1.0;
+    const speed = 90.0;
+    position = Offset(
+      position.dx + (dx / distance) * speed * dt,
+      position.dy + (dy / distance) * speed * dt,
+    );
+    _handleFootsteps(dt, isRunning: false);
   }
 
   // --- Default Patrol (Walk / Idle on floor or bubble surface) ---
