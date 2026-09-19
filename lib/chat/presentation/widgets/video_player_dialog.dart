@@ -28,32 +28,56 @@ class VideoPlayerBoundaryDialog extends StatefulWidget {
 class _VideoPlayerBoundaryDialogState extends State<VideoPlayerBoundaryDialog> {
   VideoPlayerController? _controller;
   Object? _initializationError;
+  var _isPreparing = false;
 
   String get displayName => (widget.localPath ?? widget.url).split('/').last;
 
   @override
   void initState() {
     super.initState();
+    _isPreparing = _canCreateController;
     unawaited(_prepareController());
   }
+
+  bool get _canCreateController =>
+      (widget.localPath != null && File(widget.localPath!).existsSync()) ||
+      (() {
+        final uri = Uri.tryParse(widget.url);
+        return uri != null && {'http', 'https'}.contains(uri.scheme);
+      })();
 
   Future<void> _prepareController() async {
     final localPath = widget.localPath;
     final controller = localPath != null && File(localPath).existsSync()
         ? VideoPlayerController.file(File(localPath))
         : _networkController();
-    if (controller == null) return;
+    if (controller == null) {
+      if (mounted) setState(() => _isPreparing = false);
+      return;
+    }
 
     _controller = controller;
     try {
       await controller.initialize();
-      if (mounted) setState(() {});
+      if (mounted) setState(() => _isPreparing = false);
     } catch (error) {
       _initializationError = error;
       await controller.dispose();
       _controller = null;
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {
+          _isPreparing = false;
+        });
+      }
     }
+  }
+
+  void _retry() {
+    unawaited(_controller?.dispose());
+    _controller = null;
+    _initializationError = null;
+    setState(() => _isPreparing = _canCreateController);
+    unawaited(_prepareController());
   }
 
   VideoPlayerController? _networkController() {
@@ -92,6 +116,8 @@ class _VideoPlayerBoundaryDialogState extends State<VideoPlayerBoundaryDialog> {
               padding: const EdgeInsets.all(16),
               child: initialized
                   ? _player(controller!, duration)
+                  : _isPreparing
+                  ? _loadingPlayer()
                   : _unavailablePlayer(),
             ),
             _details(duration),
@@ -206,14 +232,61 @@ class _VideoPlayerBoundaryDialogState extends State<VideoPlayerBoundaryDialog> {
           ),
           const SizedBox(height: 4),
           Text(
-            '需要有效的本機檔案或 HTTP/HTTPS URL',
+            '請確認媒體仍可存取，或稍後再試。',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.4),
               fontSize: 12,
             ),
           ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _retry,
+            icon: const Icon(Icons.refresh, color: Colors.white70),
+            label: const Text('重新載入', style: TextStyle(color: Colors.white)),
+          ),
         ],
       ),
+    ),
+  );
+
+  Widget _loadingPlayer() => Container(
+    height: 220,
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xff24263b), Color(0xff161726)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        if (widget.thumbnailUrl != null)
+          Image.network(
+            widget.thumbnailUrl!,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          ),
+        Container(color: Colors.black54),
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: Colors.white70),
+              const SizedBox(height: 14),
+              const Text('影片準備中', style: TextStyle(color: Colors.white70)),
+              if (widget.thumbnailUrl != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '正在載入預覽',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.45)),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     ),
   );
 
@@ -229,7 +302,7 @@ class _VideoPlayerBoundaryDialogState extends State<VideoPlayerBoundaryDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '使用 video_player 引擎',
+          '影片資訊',
           style: TextStyle(
             color: Color(0xffffb74d),
             fontSize: 13,
@@ -237,9 +310,6 @@ class _VideoPlayerBoundaryDialogState extends State<VideoPlayerBoundaryDialog> {
           ),
         ),
         const Divider(color: Colors.white10, height: 18),
-        _detail('檔案名稱', displayName),
-        _detail('MIME 類型', widget.mimeType),
-        _detail('檔案來源', widget.localPath ?? widget.url),
         _detail('影片時長', '${(duration / 1000).toStringAsFixed(0)} 秒'),
       ],
     ),

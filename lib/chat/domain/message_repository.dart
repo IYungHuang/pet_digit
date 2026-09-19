@@ -1,5 +1,6 @@
 import 'chat_message.dart';
 import 'message_draft.dart';
+import '../application/message_delta.dart';
 
 abstract interface class MessageRepository {
   Future<void> dispose();
@@ -8,9 +9,13 @@ abstract interface class MessageRepository {
 
   Future<void> disconnect();
 
+  Future<void> reconnect();
+
   Future<List<ChatMessage>> loadMessages(String roomId);
 
   Stream<List<ChatMessage>> watchRoomMessages(String roomId);
+
+  Stream<MessageDelta> watchDeltas();
 
   Stream<ChatMessage> watchIncomingMessages();
 

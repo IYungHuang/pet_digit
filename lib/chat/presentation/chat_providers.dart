@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 
 import '../application/media_picker_service.dart';
+import '../application/message_delta.dart';
+import '../application/message_store.dart';
 import '../data/fake/fake_media_upload_data_source.dart';
 import '../data/fake/fake_message_event_source.dart';
 import '../data/fake/fake_message_remote_data_source.dart';
@@ -77,10 +79,9 @@ final backendWebSocketUriProvider = Provider<Uri>(
       throw StateError('backendWebSocketUriProvider requires app composition'),
 );
 
-final messageConnectionStateProvider = StreamProvider.autoDispose
-    .family<MessageConnectionState, String>((ref, _) async* {
+final messageConnectionStateProvider =
+    StreamProvider.autoDispose<MessageConnectionState>((ref) async* {
       final source = ref.watch(chatEventSourceProvider);
-      yield MessageConnectionState.disconnected;
       yield* source.connectionStates();
     });
 
@@ -93,9 +94,20 @@ final chatConnectionProvider = FutureProvider.autoDispose<void>((ref) async {
 final roomMessagesProvider = StreamProvider.autoDispose
     .family<List<ChatMessage>, String>((ref, roomId) async* {
       final repository = ref.watch(chatRepositoryProvider);
-      await ref.watch(chatConnectionProvider.future);
-      yield await repository.loadMessages(roomId);
-      yield* repository.watchRoomMessages(roomId);
+      await repository.connect();
+      final store = MessageStore();
+      store.mergeInitial(await repository.loadMessages(roomId));
+      yield store.messagesForRoom(roomId);
+      await for (final delta in repository.watchDeltas()) {
+        final deltaRoomId = switch (delta) {
+          MessageAdded(:final message) => message.roomId,
+          MessageModified(:final message) => message.roomId,
+          MessageRemoved(:final roomId) => roomId,
+        };
+        if (deltaRoomId != roomId) continue;
+        store.apply(delta);
+        yield store.messagesForRoom(roomId);
+      }
     });
 
 final sendMessageProvider = Provider<SendMessage>((ref) {

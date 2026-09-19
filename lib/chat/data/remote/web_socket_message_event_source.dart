@@ -5,6 +5,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../domain/chat_message.dart';
 import '../../domain/message_connection_state.dart';
+import '../../application/message_delta.dart';
 import '../message_data_sources.dart';
 import 'remote_message_mapper.dart';
 
@@ -23,8 +24,8 @@ class WebSocketMessageEventSource implements MessageEventSource {
   final WebSocketConnector connector;
   final Duration reconnectBaseDelay;
   final int maxReconnectAttempts;
-  final StreamController<ChatMessage> _events =
-      StreamController<ChatMessage>.broadcast();
+  final StreamController<MessageDelta> _events =
+      StreamController<MessageDelta>.broadcast();
   final StreamController<MessageConnectionState> _states =
       StreamController<MessageConnectionState>.broadcast();
 
@@ -40,7 +41,12 @@ class WebSocketMessageEventSource implements MessageEventSource {
   bool get isConnected => _isReady;
 
   @override
-  Stream<ChatMessage> events() => _events.stream;
+  Stream<MessageDelta> deltas() => _events.stream;
+
+  @override
+  Stream<ChatMessage> events() => deltas()
+      .where((delta) => delta is MessageAdded)
+      .map((delta) => (delta as MessageAdded).message);
 
   @override
   Stream<MessageConnectionState> connectionStates() => _states.stream;
@@ -160,7 +166,7 @@ class WebSocketMessageEventSource implements MessageEventSource {
       final message = RemoteMessageMapper.fromWebSocket(
         Map<String, dynamic>.from(decoded),
       );
-      if (message != null) _events.add(message);
+      if (message != null) _events.add(MessageDelta.added(message));
     } on Object catch (error, stackTrace) {
       _events.addError(error, stackTrace);
     }

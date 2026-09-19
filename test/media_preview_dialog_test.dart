@@ -66,16 +66,33 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('影片播放器'), findsOneWidget);
-      expect(find.text('clip.mp4'), findsWidgets);
-
-      expect(find.text('video/mp4'), findsOneWidget);
       expect(find.textContaining('15 秒'), findsOneWidget);
       expect(find.text('影片來源尚未可播放'), findsOneWidget);
+      expect(find.text('重新載入'), findsOneWidget);
 
       // Close dialog
       await tester.tap(find.byIcon(Icons.close_rounded));
       await tester.pumpAndSettle();
       expect(find.text('影片播放器'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'VideoPlayerBoundaryDialog shows loading state for remote source',
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: VideoPlayerBoundaryDialog(
+              url: 'https://example.com/clip.mp4',
+              mimeType: 'video/mp4',
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(find.text('影片準備中'), findsOneWidget);
     },
   );
 }

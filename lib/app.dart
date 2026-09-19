@@ -19,7 +19,7 @@ class ChatPetApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xfff6f7fb),
         useMaterial3: true,
       ),
-      home: const ChatShell(),
+      home: const ChatShell(showDemoAttachments: true),
     ),
   );
 }

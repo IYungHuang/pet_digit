@@ -86,13 +86,101 @@ void main() {
     expect(find.text('Hello from UI'), findsOneWidget);
   });
 
+  testWidgets('disables send for blank and whitespace-only drafts', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const ChatPetApp());
+    await _pumpChat(tester);
+
+    final sendButton = tester.widget<IconButton>(
+      find.ancestor(
+        of: find.byIcon(Icons.send_rounded),
+        matching: find.byType(IconButton),
+      ),
+    );
+    expect(sendButton.onPressed, isNull);
+
+    await tester.enterText(find.byType(TextField), '   ');
+    await tester.pump();
+    expect(
+      tester
+          .widget<IconButton>(
+            find.ancestor(
+              of: find.byIcon(Icons.send_rounded),
+              matching: find.byType(IconButton),
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.pump();
+    expect(
+      tester
+          .widget<IconButton>(
+            find.ancestor(
+              of: find.byIcon(Icons.send_rounded),
+              matching: find.byType(IconButton),
+            ),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('preserves draft when switching rooms', (tester) async {
+    await tester.pumpWidget(const ChatPetApp());
+    await _pumpChat(tester);
+
+    await tester.enterText(find.byType(TextField), 'Friends draft');
+    await tester.tap(find.text('Family Nest'));
+    await tester.pump();
+    expect(find.byType(TextField), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      '',
+    );
+
+    await tester.tap(find.text('Pixel Pals'));
+    await tester.pump();
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      'Friends draft',
+    );
+  });
+
+  testWidgets('hides demo attachment actions outside demo composition', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(child: MaterialApp(home: ChatShell())),
+    );
+    await _pumpChat(tester);
+
+    await tester.tap(find.byTooltip('新增附件'));
+    await tester.pump();
+    expect(find.text('圖片（demo）'), findsNothing);
+    expect(find.text('影片（demo）'), findsNothing);
+  });
+
+  testWidgets(
+    'does not show transient disconnected banner during fake connect',
+    (tester) async {
+      await tester.pumpWidget(const ChatPetApp());
+      await tester.pump();
+
+      expect(find.text('尚未連線'), findsNothing);
+    },
+  );
+
   testWidgets('fake attachment flow renders image message', (tester) async {
     await tester.pumpWidget(const ChatPetApp());
     await _pumpChat(tester);
 
     await tester.tap(find.byTooltip('新增附件'));
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('圖片（fake）'));
+    await tester.tap(find.text('圖片（demo）'));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.drag(find.byType(Scrollable).first, const Offset(0, -800));
     await tester.pump();
@@ -100,38 +188,36 @@ void main() {
     expect(find.text('photo.jpg'), findsOneWidget);
   });
 
-  testWidgets('picks image via media picker service and renders optimistic message', (
-    tester,
-  ) async {
-    final fakePicker = FakeMediaPickerService();
-    fakePicker.nextPickedImage = const PickedMediaFile(
-      path: '/mock/nature_vacation.png',
-      name: 'nature_vacation.png',
-      mimeType: 'image/png',
-      kind: MediaKind.image,
-    );
+  testWidgets(
+    'picks image via media picker service and renders optimistic message',
+    (tester) async {
+      final fakePicker = FakeMediaPickerService();
+      fakePicker.nextPickedImage = const PickedMediaFile(
+        path: '/mock/nature_vacation.png',
+        name: 'nature_vacation.png',
+        mimeType: 'image/png',
+        kind: MediaKind.image,
+      );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          mediaPickerServiceProvider.overrideWithValue(fakePicker),
-        ],
-        child: const MaterialApp(home: ChatShell()),
-      ),
-    );
-    await _pumpChat(tester);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [mediaPickerServiceProvider.overrideWithValue(fakePicker)],
+          child: const MaterialApp(home: ChatShell()),
+        ),
+      );
+      await _pumpChat(tester);
 
-    await tester.tap(find.byTooltip('新增附件'));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('從相簿選擇圖片'));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, -800));
-    await tester.pump();
+      await tester.tap(find.byTooltip('新增附件'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('從相簿選擇圖片'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -800));
+      await tester.pump();
 
-    expect(fakePicker.pickImageCount, 1);
-    expect(find.text('nature_vacation.png'), findsOneWidget);
-
-  });
+      expect(fakePicker.pickImageCount, 1);
+      expect(find.text('nature_vacation.png'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'shows SnackBar when media format validation fails and preserves composer text',
@@ -143,9 +229,7 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [
-            mediaPickerServiceProvider.overrideWithValue(fakePicker),
-          ],
+          overrides: [mediaPickerServiceProvider.overrideWithValue(fakePicker)],
           child: const MaterialApp(home: ChatShell()),
         ),
       );
@@ -168,11 +252,50 @@ void main() {
     await tester.pumpWidget(const ChatPetApp());
     await _pumpChat(tester);
 
-    final scrollable = find.byType(Scrollable).first;
+    final scrollable = find.byType(ListView).last;
     await tester.drag(scrollable, const Offset(0, -420));
     await tester.pump();
 
     expect(find.text('I can see the pets reacting.'), findsWidgets);
+  });
+
+  testWidgets('timeline keeps messages aligned to the top of viewport', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const ChatPetApp());
+    await _pumpChat(tester);
+
+    final top = tester.getTopLeft(find.text('Look who joined us!')).dy;
+    expect(top, lessThan(220));
+  });
+
+  testWidgets('newly sent message is brought into the lower timeline area', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const ChatPetApp());
+    await _pumpChat(tester);
+
+    await tester.enterText(find.byType(TextField), 'bottom placement check');
+    await tester.tap(find.byTooltip('發送'));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    final message = find.text('bottom placement check');
+    expect(message, findsOneWidget);
+    expect(tester.getBottomRight(message).dy, greaterThan(420));
+  });
+
+  testWidgets('short room history is bottom-aligned above composer', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const ChatPetApp());
+    await _pumpChat(tester);
+    await tester.tap(find.text('Family Nest'));
+    await _pumpChat(tester);
+
+    final lastBottom = tester.getBottomRight(find.text('Cat video.gif')).dy;
+    final composerTop = tester.getTopLeft(find.byType(TextField)).dy;
+    expect(lastBottom, greaterThan(400));
+    expect(composerTop - lastBottom, lessThan(100));
   });
 
   testWidgets('tapping preview button on media card opens ImagePreviewDialog', (
@@ -193,11 +316,9 @@ void main() {
 
     expect(find.byIcon(Icons.close_rounded), findsNothing);
   });
-
 }
 
 Future<void> _pumpChat(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 50));
 }
-

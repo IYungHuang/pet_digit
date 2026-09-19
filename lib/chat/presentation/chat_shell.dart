@@ -17,10 +17,13 @@ import '../../pet/domain/pet_world_controller.dart';
 import '../../pet/presentation/pet_world_overlay.dart';
 import '../application/media_picker_service.dart';
 import 'chat_providers.dart';
+import 'chat_timeline_policy.dart';
 import 'widgets/media_preview_dialog.dart';
 
 class ChatShell extends ConsumerStatefulWidget {
-  const ChatShell({super.key});
+  const ChatShell({super.key, this.showDemoAttachments = false});
+
+  final bool showDemoAttachments;
 
   @override
   ConsumerState<ChatShell> createState() => _ChatShellState();
@@ -33,8 +36,13 @@ class _ChatShellState extends ConsumerState<ChatShell> {
   final _scrollController = ScrollController();
   final _composerController = TextEditingController();
   final Map<String, GlobalKey> _cardKeys = {};
+  final Map<String, double> _roomScrollOffsets = {};
+  final Map<String, String> _roomDrafts = {};
   var _activeRoomId = 'friends';
   var _lastMessageCount = 0;
+  var _isNearBottom = true;
+  var _hasNewMessages = false;
+  final Set<String> _retryingClientIds = <String>{};
 
   ChatRoom get _room => FakeChatRepository.roomById(_activeRoomId);
 
@@ -43,6 +51,8 @@ class _ChatShellState extends ConsumerState<ChatShell> {
     super.initState();
     _world.loadRoom(_room);
     _scrollController.addListener(_syncBubbleBounds);
+    _scrollController.addListener(_handleScroll);
+    _composerController.addListener(_saveDraft);
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncBubbleBounds());
   }
 
@@ -51,6 +61,25 @@ class _ChatShellState extends ConsumerState<ChatShell> {
     _composerController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _saveDraft() {
+    _roomDrafts[_activeRoomId] = _composerController.text;
+  }
+
+  void _handleScroll() {
+    if (!_scrollController.hasClients) return;
+    final isNearBottom = ChatTimelinePolicy.isNearBottom(
+      pixels: _scrollController.position.pixels,
+      maxScrollExtent: _scrollController.position.maxScrollExtent,
+    );
+    _roomScrollOffsets[_activeRoomId] = _scrollController.position.pixels;
+    if (isNearBottom != _isNearBottom) {
+      _isNearBottom = isNearBottom;
+      if (isNearBottom && _hasNewMessages && mounted) {
+        setState(() => _hasNewMessages = false);
+      }
+    }
   }
 
   void _syncBubbleBounds() {
@@ -70,13 +99,33 @@ class _ChatShellState extends ConsumerState<ChatShell> {
   }
 
   void _selectRoom(String id) {
+    _saveDraft();
+    if (_scrollController.hasClients) {
+      _roomScrollOffsets[_activeRoomId] = _scrollController.position.pixels;
+    }
     setState(() {
       _activeRoomId = id;
       _cardKeys.clear();
       _lastMessageCount = 0;
+      _hasNewMessages = false;
+      _isNearBottom = true;
       _world.loadRoom(_room);
     });
+    _composerController.value = TextEditingValue(
+      text: _roomDrafts[id] ?? '',
+      selection: TextSelection.collapsed(
+        offset: (_roomDrafts[id] ?? '').length,
+      ),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncBubbleBounds());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      final offset = _roomScrollOffsets[id];
+      if (offset == null) return;
+      _scrollController.jumpTo(
+        offset.clamp(0, _scrollController.position.maxScrollExtent),
+      );
+    });
   }
 
   void _sendText(String text) {
@@ -182,12 +231,29 @@ class _ChatShellState extends ConsumerState<ChatShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        _isNearBottom = true;
+        if (_hasNewMessages && mounted) setState(() => _hasNewMessages = false);
       }
     });
   }
 
+  void _reconnect() {
+    if (_scrollController.hasClients) {
+      _roomScrollOffsets[_activeRoomId] = _scrollController.position.pixels;
+    }
+    unawaited(ref.read(chatRepositoryProvider).reconnect());
+  }
+
   void _retry(ChatMessage message) {
-    unawaited(_send(message.content, clientId: message.clientId));
+    if (!_retryingClientIds.add(message.clientId)) return;
+    setState(() {});
+    unawaited(
+      _send(message.content, clientId: message.clientId).whenComplete(() {
+        if (mounted) {
+          setState(() => _retryingClientIds.remove(message.clientId));
+        }
+      }),
+    );
   }
 
   void _interact(ChatMessage message) {
@@ -196,12 +262,32 @@ class _ChatShellState extends ConsumerState<ChatShell> {
     setState(() {});
   }
 
+  Widget _buildMessageCard(ChatMessage message) {
+    final key = _cardKeys.putIfAbsent(message.clientId, GlobalKey.new);
+    return _MessageCard(
+      cardKey: key,
+      message: message,
+      controller: _world,
+      onTap: () => _interact(message),
+      onOpenImagePreview: message.content is ImageMessageContent
+          ? () => _openImagePreview(message.content as ImageMessageContent)
+          : null,
+      onOpenVideoPlayer: message.content is VideoMessageContent
+          ? () => _openVideoPlayer(message.content as VideoMessageContent)
+          : null,
+      onRetry:
+          message.status == MessageDeliveryStatus.failed &&
+              !_retryingClientIds.contains(message.clientId)
+          ? () => _retry(message)
+          : null,
+      retrying: _retryingClientIds.contains(message.clientId),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final messageState = ref.watch(roomMessagesProvider(_activeRoomId));
-    final connectionState = ref.watch(
-      messageConnectionStateProvider(_activeRoomId),
-    );
+    final connectionState = ref.watch(messageConnectionStateProvider);
     final messages = messageState.asData?.value;
     if (messages != null) {
       _world.setMessageBubbleTargets(messages);
@@ -212,13 +298,15 @@ class _ChatShellState extends ConsumerState<ChatShell> {
           _lastMessageCount > 0 && messageCount > _lastMessageCount;
       _lastMessageCount = messageCount;
       if (hasNewMessage) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.jumpTo(
-              _scrollController.position.maxScrollExtent,
-            );
-          }
-        });
+        if (ChatTimelinePolicy.shouldFollowNewMessage(
+          isNearBottom: _isNearBottom,
+        )) {
+          _scrollToLatest();
+        } else {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _hasNewMessages = true);
+          });
+        }
       }
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncBubbleBounds());
@@ -270,49 +358,76 @@ class _ChatShellState extends ConsumerState<ChatShell> {
             activeRoomId: _activeRoomId,
             onSelected: _selectRoom,
           ),
-          _ConnectionBanner(state: connectionState),
+          _ConnectionBanner(state: connectionState, onReconnect: _reconnect),
           Expanded(
             child: Stack(
               key: _stackKey,
               children: [
-                messageState.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (error, _) => Center(child: Text('載入失敗：$error')),
-                  data: (messages) => ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(18, 20, 18, 104),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final message = messages[index];
-                      final key = _cardKeys.putIfAbsent(
-                        message.clientId,
-                        GlobalKey.new,
-                      );
-                      return _MessageCard(
-                        cardKey: key,
-                        message: message,
-                        controller: _world,
-                        onTap: () => _interact(message),
-                        onOpenImagePreview:
-                            message.content is ImageMessageContent
-                            ? () => _openImagePreview(
-                                message.content as ImageMessageContent,
-                              )
-                            : null,
-                        onOpenVideoPlayer:
-                            message.content is VideoMessageContent
-                            ? () => _openVideoPlayer(
-                                message.content as VideoMessageContent,
-                              )
-                            : null,
-                        onRetry: message.status == MessageDeliveryStatus.failed
-                            ? () => _retry(message)
-                            : null,
-                      );
-                    },
+                Positioned.fill(
+                  child: messageState.when(
+                    loading: () => const _TimelineLoading(),
+                    error: (error, _) => _TimelineError(
+                      onRetry: () =>
+                          ref.invalidate(roomMessagesProvider(_activeRoomId)),
+                    ),
+                    data: (messages) => LayoutBuilder(
+                      builder: (context, constraints) {
+                        const verticalPadding = 44.0;
+                        final minTimelineHeight =
+                            constraints.maxHeight > verticalPadding
+                            ? constraints.maxHeight - verticalPadding
+                            : 0.0;
+                        final content = messages.isEmpty
+                            ? const <Widget>[_TimelineEmpty()]
+                            : messages.map(_buildMessageCard).toList();
+                        final timelineWidth = constraints.maxWidth > 900
+                            ? 900.0
+                            : constraints.maxWidth;
+                        return Center(
+                          child: SizedBox(
+                            width: timelineWidth,
+                            height: constraints.maxHeight,
+                            child: ListView(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.fromLTRB(
+                                18,
+                                20,
+                                18,
+                                24,
+                              ),
+                              children: [
+                                ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    minHeight: minTimelineHeight,
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: messages.isEmpty
+                                        ? MainAxisAlignment.center
+                                        : MainAxisAlignment.end,
+                                    children: content,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
+                if (_hasNewMessages)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                    child: Center(
+                      child: FilledButton.tonalIcon(
+                        onPressed: _scrollToLatest,
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                        label: const Text('有新訊息'),
+                      ),
+                    ),
+                  ),
                 PetWorldOverlay(room: _room, controller: _world),
               ],
             ),
@@ -327,6 +442,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
           onAttachment: _sendDemoMedia,
           onPickedMedia: _sendPickedMedia,
           onError: (msg) => _showFeedback(msg, isError: true),
+          showDemoAttachments: widget.showDemoAttachments,
         ),
       ),
     );
@@ -334,16 +450,15 @@ class _ChatShellState extends ConsumerState<ChatShell> {
 }
 
 class _ConnectionBanner extends StatelessWidget {
-  const _ConnectionBanner({required this.state});
+  const _ConnectionBanner({required this.state, required this.onReconnect});
 
   final AsyncValue<MessageConnectionState> state;
+  final VoidCallback onReconnect;
 
   @override
   Widget build(BuildContext context) {
     final connection = state.valueOrNull;
-    if (connection == null ||
-        connection == MessageConnectionState.connected ||
-        connection == MessageConnectionState.disconnected) {
+    if (connection == null || connection == MessageConnectionState.connected) {
       return const SizedBox.shrink();
     }
     final (label, color, icon) = switch (connection) {
@@ -370,11 +485,104 @@ class _ConnectionBanner extends StatelessWidget {
         children: [
           Icon(icon, size: 15, color: color),
           const SizedBox(width: 6),
-          Text(label, style: TextStyle(color: color, fontSize: 12)),
+          Expanded(
+            child: Text(label, style: TextStyle(color: color, fontSize: 12)),
+          ),
+          if (connection == MessageConnectionState.offline ||
+              connection == MessageConnectionState.error ||
+              connection == MessageConnectionState.disconnected)
+            TextButton(
+              onPressed: onReconnect,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(44, 36),
+                foregroundColor: color,
+              ),
+              child: const Text('重新連線'),
+            ),
         ],
       ),
     );
   }
+}
+
+class _TimelineLoading extends StatelessWidget {
+  const _TimelineLoading();
+
+  @override
+  Widget build(BuildContext context) => ListView.builder(
+    padding: const EdgeInsets.fromLTRB(18, 20, 18, 24),
+    itemCount: 4,
+    itemBuilder: (context, index) => Align(
+      alignment: index.isEven ? Alignment.centerLeft : Alignment.centerRight,
+      child: Container(
+        width: 180 + (index % 2) * 48,
+        height: 52,
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(18),
+        ),
+      ),
+    ),
+  );
+}
+
+class _TimelineEmpty extends StatelessWidget {
+  const _TimelineEmpty();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.forum_outlined,
+            size: 48,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          const Text('這裡還沒有訊息'),
+          const SizedBox(height: 4),
+          Text(
+            '發送第一則訊息，讓寵物開始互動吧！',
+            style: Theme.of(context).textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _TimelineError extends StatelessWidget {
+  const _TimelineError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.cloud_off_outlined, size: 48),
+          const SizedBox(height: 12),
+          const Text('訊息載入失敗'),
+          const SizedBox(height: 4),
+          Text('請檢查連線後再試一次。', style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('重試'),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _RoomSelector extends StatelessWidget {
@@ -417,6 +625,7 @@ class _MessageCard extends StatelessWidget {
     this.onOpenImagePreview,
     this.onOpenVideoPlayer,
     this.onRetry,
+    this.retrying = false,
   });
 
   final GlobalKey cardKey;
@@ -426,6 +635,23 @@ class _MessageCard extends StatelessWidget {
   final VoidCallback? onOpenImagePreview;
   final VoidCallback? onOpenVideoPlayer;
   final VoidCallback? onRetry;
+  final bool retrying;
+
+  String get _semanticsLabel {
+    final contentLabel = switch (message.content) {
+      TextMessageContent(:final text) => text,
+      ImageMessageContent() => '圖片訊息',
+      VideoMessageContent() => '影片訊息',
+    };
+    final statusLabel = switch (message.status) {
+      MessageDeliveryStatus.sent => '已送出',
+      MessageDeliveryStatus.failed => '送出失敗',
+      MessageDeliveryStatus.pending => '準備送出',
+      MessageDeliveryStatus.uploading => '上傳中',
+      MessageDeliveryStatus.sending => '送出中',
+    };
+    return '${message.senderId}：$contentLabel，$statusLabel。點擊讓寵物互動。';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -434,58 +660,66 @@ class _MessageCard extends StatelessWidget {
 
     return Align(
       alignment: message.isMine ? Alignment.centerRight : Alignment.centerLeft,
-      child: GestureDetector(
+      child: Semantics(
+        button: onTap != null,
+        label: _semanticsLabel,
         onTap: onTap,
-        child: AnimatedBuilder(
-          animation: controller.springNotifier,
-          builder: (context, child) {
-            final deflection = controller.getBubbleDeflection(message.clientId);
-            final scaleY = (1.0 - (deflection / 240.0)).clamp(0.85, 1.15);
-            final scaleX = (1.0 + (deflection / 340.0)).clamp(0.90, 1.15);
-            return Transform.translate(
-              offset: Offset(0, deflection),
-              child: Transform(
-                transform: Matrix4.diagonal3Values(scaleX, scaleY, 1.0),
-                alignment: Alignment.bottomCenter,
-                child: child,
-              ),
-            );
-          },
-          child: Container(
-            key: cardKey,
-            margin: const EdgeInsets.only(bottom: 14),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            constraints: const BoxConstraints(maxWidth: 300),
-            decoration: BoxDecoration(
-              color: bubbleColor,
-              borderRadius: BorderRadius.circular(18).copyWith(
-                bottomRight: message.isMine ? const Radius.circular(4) : null,
-                bottomLeft: !message.isMine ? const Radius.circular(4) : null,
-              ),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x10000000),
-                  blurRadius: 10,
-                  offset: Offset(0, 4),
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedBuilder(
+            animation: controller.springNotifier,
+            builder: (context, child) {
+              final deflection = controller.getBubbleDeflection(
+                message.clientId,
+              );
+              final scaleY = (1.0 - (deflection / 240.0)).clamp(0.85, 1.15);
+              final scaleX = (1.0 + (deflection / 340.0)).clamp(0.90, 1.15);
+              return Transform.translate(
+                offset: Offset(0, deflection),
+                child: Transform(
+                  transform: Matrix4.diagonal3Values(scaleX, scaleY, 1.0),
+                  alignment: Alignment.bottomCenter,
+                  child: child,
                 ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _MessageContentView(
-                  message: message,
-                  textColor: textColor,
-                  onOpenImagePreview: onOpenImagePreview,
-                  onOpenVideoPlayer: onOpenVideoPlayer,
+              );
+            },
+            child: Container(
+              key: cardKey,
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              constraints: const BoxConstraints(maxWidth: 300),
+              decoration: BoxDecoration(
+                color: bubbleColor,
+                borderRadius: BorderRadius.circular(18).copyWith(
+                  bottomRight: message.isMine ? const Radius.circular(4) : null,
+                  bottomLeft: !message.isMine ? const Radius.circular(4) : null,
                 ),
-                if (message.status != MessageDeliveryStatus.sent)
-                  _MessageStatus(
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x10000000),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _MessageContentView(
                     message: message,
                     textColor: textColor,
-                    onRetry: onRetry,
+                    onOpenImagePreview: onOpenImagePreview,
+                    onOpenVideoPlayer: onOpenVideoPlayer,
                   ),
-              ],
+                  if (message.status != MessageDeliveryStatus.sent)
+                    _MessageStatus(
+                      message: message,
+                      textColor: textColor,
+                      onRetry: onRetry,
+                      retrying: retrying,
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -592,16 +826,15 @@ class _ImageMessageCard extends StatelessWidget {
           ),
           if (onPreview != null) ...[
             const SizedBox(width: 4),
-            InkWell(
-              onTap: onPreview,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(2),
-                child: Icon(
-                  Icons.fullscreen_rounded,
-                  size: 18,
-                  color: textColor.withValues(alpha: 0.9),
-                ),
+            IconButton(
+              onPressed: onPreview,
+              tooltip: '預覽圖片',
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              padding: EdgeInsets.zero,
+              icon: Icon(
+                Icons.fullscreen_rounded,
+                size: 18,
+                color: textColor.withValues(alpha: 0.9),
               ),
             ),
           ],
@@ -722,16 +955,15 @@ class _ImageMessageCard extends StatelessWidget {
             ),
             if (onPreview != null) ...[
               const SizedBox(width: 4),
-              InkWell(
-                onTap: onPreview,
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(2),
-                  child: Icon(
-                    Icons.fullscreen_rounded,
-                    size: 18,
-                    color: textColor.withValues(alpha: 0.9),
-                  ),
+              IconButton(
+                onPressed: onPreview,
+                tooltip: '預覽圖片',
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                padding: EdgeInsets.zero,
+                icon: Icon(
+                  Icons.fullscreen_rounded,
+                  size: 18,
+                  color: textColor.withValues(alpha: 0.9),
                 ),
               ),
             ],
@@ -883,16 +1115,15 @@ class _VideoMessageCard extends StatelessWidget {
             ),
             if (onPlay != null) ...[
               const SizedBox(width: 4),
-              InkWell(
-                onTap: onPlay,
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(2),
-                  child: Icon(
-                    Icons.open_in_new_rounded,
-                    size: 16,
-                    color: textColor.withValues(alpha: 0.9),
-                  ),
+              IconButton(
+                onPressed: onPlay,
+                tooltip: '開啟影片',
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                padding: EdgeInsets.zero,
+                icon: Icon(
+                  Icons.open_in_new_rounded,
+                  size: 16,
+                  color: textColor.withValues(alpha: 0.9),
                 ),
               ),
             ],
@@ -908,17 +1139,37 @@ class _MessageStatus extends StatelessWidget {
     required this.message,
     required this.textColor,
     this.onRetry,
+    this.retrying = false,
   });
 
   final ChatMessage message;
   final Color textColor;
   final VoidCallback? onRetry;
+  final bool retrying;
+
+  String get _failureLabel {
+    final error = message.error?.toLowerCase() ?? '';
+    if (error.contains('socket') ||
+        error.contains('offline') ||
+        error.contains('network')) {
+      return '目前離線，尚未送出';
+    }
+    if (error.contains('permission') || error.contains('unauthorized')) {
+      return '沒有權限，無法送出';
+    }
+    if (error.contains('size') || error.contains('format')) {
+      return '檔案格式或大小不符合';
+    }
+    return '發送失敗，可重試';
+  }
 
   @override
   Widget build(BuildContext context) {
     final isFailed = message.status == MessageDeliveryStatus.failed;
-    final label = isFailed
-        ? '發送失敗'
+    final label = retrying
+        ? '重試中…'
+        : isFailed
+        ? _failureLabel
         : message.status == MessageDeliveryStatus.uploading
         ? '上傳 ${(message.uploadProgress * 100).round()}%'
         : '發送中…';
@@ -947,7 +1198,16 @@ class _MessageStatus extends StatelessWidget {
               fontSize: 11,
             ),
           ),
-          if (isFailed && onRetry != null)
+          if (isFailed && retrying)
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: textColor.withValues(alpha: 0.8),
+              ),
+            ),
+          if (isFailed && onRetry != null && !retrying)
             TextButton(
               onPressed: onRetry,
               style: TextButton.styleFrom(
@@ -955,7 +1215,7 @@ class _MessageStatus extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 minimumSize: const Size(44, 32),
               ),
-              child: const Text('重試'),
+              child: const Text('重試發送'),
             ),
         ],
       ),
@@ -979,6 +1239,7 @@ class _MessageComposer extends ConsumerWidget {
     required this.onAttachment,
     required this.onPickedMedia,
     required this.onError,
+    required this.showDemoAttachments,
   });
 
   final TextEditingController controller;
@@ -986,8 +1247,10 @@ class _MessageComposer extends ConsumerWidget {
   final ValueChanged<_DemoAttachment> onAttachment;
   final ValueChanged<PickedMediaFile> onPickedMedia;
   final ValueChanged<String> onError;
+  final bool showDemoAttachments;
 
   Future<void> _handleAttachment(BuildContext context, WidgetRef ref) async {
+    final canUseCamera = Platform.isAndroid || Platform.isIOS;
     final choice = await showDialog<_AttachmentChoice>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1007,17 +1270,18 @@ class _MessageComposer extends ConsumerWidget {
                   context,
                 ).pop(_AttachmentChoice.pickGalleryImage),
               ),
-              ListTile(
-                leading: const Icon(
-                  Icons.camera_alt_outlined,
-                  color: Color(0xff6c63ff),
+              if (canUseCamera)
+                ListTile(
+                  leading: const Icon(
+                    Icons.camera_alt_outlined,
+                    color: Color(0xff6c63ff),
+                  ),
+                  title: const Text('拍攝照片'),
+                  subtitle: const Text('開啟相機拍攝'),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).pop(_AttachmentChoice.pickCameraImage),
                 ),
-                title: const Text('拍攝照片'),
-                subtitle: const Text('開啟相機拍攝（行動裝置支援）'),
-                onTap: () => Navigator.of(
-                  context,
-                ).pop(_AttachmentChoice.pickCameraImage),
-              ),
               ListTile(
                 leading: const Icon(
                   Icons.video_library_outlined,
@@ -1029,30 +1293,33 @@ class _MessageComposer extends ConsumerWidget {
                   context,
                 ).pop(_AttachmentChoice.pickGalleryVideo),
               ),
-              ListTile(
-                leading: const Icon(
-                  Icons.videocam_outlined,
-                  color: Color(0xff6c63ff),
+              if (canUseCamera)
+                ListTile(
+                  leading: const Icon(
+                    Icons.videocam_outlined,
+                    color: Color(0xff6c63ff),
+                  ),
+                  title: const Text('錄製影片'),
+                  subtitle: const Text('開啟攝影機錄製'),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).pop(_AttachmentChoice.pickCameraVideo),
                 ),
-                title: const Text('錄製影片'),
-                subtitle: const Text('開啟攝影機錄製（行動裝置支援）'),
-                onTap: () => Navigator.of(
-                  context,
-                ).pop(_AttachmentChoice.pickCameraVideo),
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.image_outlined),
-                title: const Text('圖片（fake）'),
-                onTap: () =>
-                    Navigator.of(context).pop(_AttachmentChoice.fakeImage),
-              ),
-              ListTile(
-                leading: const Icon(Icons.video_file_outlined),
-                title: const Text('影片（fake）'),
-                onTap: () =>
-                    Navigator.of(context).pop(_AttachmentChoice.fakeVideo),
-              ),
+              if (showDemoAttachments) ...[
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.image_outlined),
+                  title: const Text('圖片（demo）'),
+                  onTap: () =>
+                      Navigator.of(context).pop(_AttachmentChoice.fakeImage),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.video_file_outlined),
+                  title: const Text('影片（demo）'),
+                  onTap: () =>
+                      Navigator.of(context).pop(_AttachmentChoice.fakeVideo),
+                ),
+              ],
             ],
           ),
         ),
@@ -1123,10 +1390,16 @@ class _MessageComposer extends ConsumerWidget {
               ),
             ),
           ),
-          IconButton(
-            tooltip: '發送',
-            onPressed: () => onSend(controller.text),
-            icon: const Icon(Icons.send_rounded),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, _) {
+              final canSend = value.text.trim().isNotEmpty;
+              return IconButton(
+                tooltip: '發送',
+                onPressed: canSend ? () => onSend(value.text) : null,
+                icon: const Icon(Icons.send_rounded),
+              );
+            },
           ),
         ],
       ),

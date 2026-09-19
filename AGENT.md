@@ -14,6 +14,14 @@ Read [docs/handoff/chat-room-ui-handoff.md](docs/handoff/chat-room-ui-handoff.md
 when continuing chat room UI, provider, fake-adapter, or pet-bubble work from
 the current Phase 4 baseline.
 
+Read [Firebase Chat Backend 規格書](docs/specs/2026-09-19-firebase-chat-backend-spec.md)
+before changing backend composition, Auth, Firestore, Storage, Functions, or
+Firebase migration boundaries.
+
+Read [Chat Room UI/UX 體驗優化報告](docs/reviews/2026-09-19-chat-uiux-review.md)
+before changing chat interaction, accessibility, media recovery, scrolling, or
+responsive layout.
+
 Before commit, follow [Git Commit Gate](docs/git-commit-gate.md): peer review
 first, then run the automated gate. Repository hook lives at `.githooks`.
 

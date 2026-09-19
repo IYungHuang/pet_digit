@@ -72,6 +72,46 @@ void main() {
     expect(values.last.single.status, MessageDeliveryStatus.sent);
   });
 
+  test('connection invalidation preserves room message projection', () async {
+    final events = FakeMessageEventSource();
+    final repository = _createRepository(events);
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await repository.dispose();
+    });
+
+    final values = <List<dynamic>>[];
+    final subscription = container.listen<AsyncValue<List<dynamic>>>(
+      roomMessagesProvider('friends'),
+      (_, next) => next.whenData(values.add),
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+
+    await container.read(roomMessagesProvider('friends').future);
+    await container.read(sendMessageProvider)(
+      MessageDraft(
+        clientId: 'persist-client',
+        roomId: 'friends',
+        senderId: 'me',
+        content: const MessageContent.text(text: 'persist'),
+        createdAt: DateTime(2026, 9, 19),
+        isMine: true,
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(values.last, hasLength(1));
+
+    container.invalidate(chatConnectionProvider);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(values.last, hasLength(1));
+    expect(values.last.single.clientId, 'persist-client');
+  });
+
   test(
     'send provider delegates upload progress and returns sent message',
     () async {
@@ -116,7 +156,6 @@ void main() {
     expect(picker, isNotNull);
   });
 }
-
 
 FakeMessageRepository _createRepository(FakeMessageEventSource events) =>
     FakeMessageRepository(

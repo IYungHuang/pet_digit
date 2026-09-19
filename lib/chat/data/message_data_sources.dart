@@ -2,6 +2,7 @@ import '../domain/chat_message.dart';
 import '../domain/message_content.dart';
 import '../domain/message_draft.dart';
 import '../domain/message_connection_state.dart';
+import '../application/message_delta.dart';
 
 class RemoteMessageReceipt {
   const RemoteMessageReceipt({
@@ -31,6 +32,9 @@ abstract interface class MediaUploadDataSource {
 }
 
 abstract interface class MessageEventSource {
+  Stream<MessageDelta> deltas();
+
+  /// Compatibility projection for legacy Gespraech consumers.
   Stream<ChatMessage> events();
 
   Stream<MessageConnectionState> connectionStates();

@@ -134,6 +134,17 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(await repository.loadMessages('room-1'), hasLength(1));
   });
+
+  test('reconnect preserves normalized message store', () async {
+    await repository.send(_textDraft(clientId: 'reconnect-client'));
+
+    await repository.reconnect();
+
+    final messages = await repository.loadMessages('room-1');
+    expect(messages, hasLength(1));
+    expect(messages.single.clientId, 'reconnect-client');
+    expect(messages.single.status, MessageDeliveryStatus.sent);
+  });
 }
 
 MessageDraft _textDraft({String clientId = 'client-text'}) => MessageDraft(

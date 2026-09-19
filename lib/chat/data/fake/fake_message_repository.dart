@@ -6,6 +6,8 @@ import '../../domain/message_draft.dart';
 import '../../domain/message_repository.dart';
 import '../../domain/message_status.dart';
 import '../message_data_sources.dart';
+import '../../application/message_delta.dart';
+import '../../application/message_store.dart';
 
 class FakeMessageRepository implements MessageRepository {
   FakeMessageRepository({
@@ -18,20 +20,20 @@ class FakeMessageRepository implements MessageRepository {
   final MediaUploadDataSource upload;
   final MessageEventSource events;
 
-  final Map<String, ChatMessage> _messagesByClientId = {};
-  final Map<String, String> _clientIdByServerId = {};
-  final Map<String, List<String>> _orderedClientIdsByRoom = {};
+  final MessageStore _store = MessageStore();
   final Map<String, StreamController<List<ChatMessage>>> _roomControllers = {};
+  final StreamController<MessageDelta> _deltaController =
+      StreamController<MessageDelta>.broadcast();
   final StreamController<ChatMessage> _incomingController =
       StreamController<ChatMessage>.broadcast();
 
-  StreamSubscription<ChatMessage>? _eventSubscription;
+  StreamSubscription<MessageDelta>? _eventSubscription;
   bool _connected = false;
 
   @override
   Future<void> connect() async {
     if (_connected) return;
-    _eventSubscription = events.events().listen(_handleIncoming);
+    _eventSubscription = events.deltas().listen(_handleDelta);
     _connected = true;
     try {
       await events.connect();
@@ -54,15 +56,17 @@ class FakeMessageRepository implements MessageRepository {
   }
 
   @override
-  Future<List<ChatMessage>> loadMessages(String roomId) async => [
-    for (final clientId in _orderedClientIdsByRoom[roomId] ?? const [])
-      _messagesByClientId[clientId]!,
-  ];
+  Future<void> reconnect() async {
+    await disconnect();
+    await connect();
+  }
+
+  @override
+  Future<List<ChatMessage>> loadMessages(String roomId) async =>
+      _store.messagesForRoom(roomId);
 
   void seedMessages(Iterable<ChatMessage> messages) {
-    for (final message in messages) {
-      _upsert(message);
-    }
+    _store.mergeInitial(messages);
   }
 
   @override
@@ -74,6 +78,9 @@ class FakeMessageRepository implements MessageRepository {
       .stream;
 
   @override
+  Stream<MessageDelta> watchDeltas() => _deltaController.stream;
+
+  @override
   Stream<ChatMessage> watchIncomingMessages() => _incomingController.stream;
 
   @override
@@ -81,7 +88,7 @@ class FakeMessageRepository implements MessageRepository {
     MessageDraft draft, {
     void Function(double progress)? onUploadProgress,
   }) async {
-    _upsert(ChatMessage.fromDraft(draft));
+    _applyDelta(MessageDelta.added(ChatMessage.fromDraft(draft)));
 
     var effectiveDraft = draft;
     if (_requiresUpload(draft.content) && !upload.isAtomicUpload) {
@@ -175,56 +182,48 @@ class FakeMessageRepository implements MessageRepository {
   Future<void> dispose() async {
     await disconnect();
     await _incomingController.close();
+    await _deltaController.close();
     for (final controller in _roomControllers.values) {
       await controller.close();
     }
   }
 
-  void _handleIncoming(ChatMessage incoming) {
-    final merged = _upsert(incoming);
-    _incomingController.add(merged);
+  void _handleDelta(MessageDelta delta) {
+    _applyDelta(delta);
   }
 
-  ChatMessage _upsert(ChatMessage message) {
-    final existingClientId = message.serverId == null
-        ? null
-        : _clientIdByServerId[message.serverId!];
-    final clientId = existingClientId ?? message.clientId;
-    final normalized = clientId == message.clientId
-        ? message
-        : message.copyWith(clientId: clientId);
-
-    _messagesByClientId[clientId] = normalized;
-    if (normalized.serverId != null) {
-      _clientIdByServerId[normalized.serverId!] = clientId;
-    }
-
-    final roomOrder = _orderedClientIdsByRoom.putIfAbsent(
-      normalized.roomId,
-      () => <String>[],
-    );
-    if (!roomOrder.contains(clientId)) roomOrder.add(clientId);
-    _emitRoom(normalized.roomId);
-    return normalized;
+  void _applyDelta(MessageDelta delta) {
+    _store.apply(delta);
+    _deltaController.add(delta);
+    final roomId = switch (delta) {
+      MessageAdded(:final message) => message.roomId,
+      MessageModified(:final message) => message.roomId,
+      MessageRemoved(:final roomId) => roomId,
+    };
+    final message = switch (delta) {
+      MessageAdded(:final message) => message,
+      MessageModified(:final message) => message,
+      MessageRemoved() => null,
+    };
+    if (message != null) _incomingController.add(message);
+    _emitRoom(roomId);
   }
 
   ChatMessage _update(
     String clientId,
     ChatMessage Function(ChatMessage message) update,
   ) {
-    final current = _messagesByClientId[clientId];
+    final current = _store.messageByClientId(clientId);
     if (current == null) throw StateError('unknown clientId: $clientId');
-    return _upsert(update(current));
+    final next = update(current);
+    _applyDelta(MessageDelta.modified(next));
+    return _store.messageByClientId(next.clientId)!;
   }
 
   void _emitRoom(String roomId) {
     final controller = _roomControllers[roomId];
     if (controller != null && !controller.isClosed) {
-      final snapshot = [
-        for (final clientId in _orderedClientIdsByRoom[roomId] ?? const [])
-          _messagesByClientId[clientId]!,
-      ];
-      controller.add(snapshot);
+      controller.add(_store.messagesForRoom(roomId));
     }
   }
 
