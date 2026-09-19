@@ -45,6 +45,26 @@ void main() {
     expect(find.text('watching'), findsOneWidget);
   });
 
+  testWidgets('server-backed message card measures its canonical pet target', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const ChatPetApp());
+    await _pumpChat(tester);
+
+    final overlay = tester.widget<PetWorldOverlay>(
+      find.byType(PetWorldOverlay),
+    );
+    final target =
+        overlay.controller.objects.firstWhere(
+              (object) => object.id == 'seed-f2',
+            )
+            as PetBoundedInteractable;
+
+    expect(target.hasMeasuredBounds, isTrue);
+    expect(target.bounds.width, greaterThan(0));
+    expect(target.bounds.height, greaterThan(0));
+  });
+
   testWidgets('switches between Corgi, Cat, and Parrot from AppBar capsule', (
     tester,
   ) async {

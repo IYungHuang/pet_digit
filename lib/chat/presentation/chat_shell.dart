@@ -14,6 +14,7 @@ import '../../chat/domain/message_status.dart';
 import '../../chat/domain/message_connection_state.dart';
 import '../../pet/domain/pet_world.dart';
 import '../../pet/domain/pet_world_controller.dart';
+import '../../pet/domain/pet_message_target_factory.dart';
 import '../../pet/presentation/pet_world_overlay.dart';
 import '../application/media_picker_service.dart';
 import 'chat_providers.dart';
@@ -258,12 +259,15 @@ class _ChatShellState extends ConsumerState<ChatShell> {
 
   void _interact(ChatMessage message) {
     _syncBubbleBounds();
-    _world.interact(message.serverId ?? message.clientId);
+    _world.interact(PetMessageTargetFactory.domainMessageId(message));
     setState(() {});
   }
 
   Widget _buildMessageCard(ChatMessage message) {
-    final key = _cardKeys.putIfAbsent(message.clientId, GlobalKey.new);
+    final key = _cardKeys.putIfAbsent(
+      PetMessageTargetFactory.domainMessageId(message),
+      GlobalKey.new,
+    );
     return _MessageCard(
       cardKey: key,
       message: message,

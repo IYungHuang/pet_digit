@@ -9,6 +9,9 @@ import 'pet_world.dart';
 class PetMessageTargetFactory {
   const PetMessageTargetFactory._();
 
+  static String domainMessageId(domain.ChatMessage message) =>
+      message.serverId ?? message.clientId;
+
   static PetMessageTarget fromDomainMessage(domain.ChatMessage message) {
     final normalized = switch (message.content) {
       TextMessageContent(:final text) => _NormalizedMessage(
@@ -32,10 +35,7 @@ class PetMessageTargetFactory {
       ),
     };
 
-    return _targetFor(
-      id: message.serverId ?? message.clientId,
-      normalized: normalized,
-    );
+    return _targetFor(id: domainMessageId(message), normalized: normalized);
   }
 
   static PetMessageTarget fromLegacyMessage(legacy.ChatMessage message) {
