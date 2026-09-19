@@ -22,6 +22,11 @@ Read [Chat Room UI/UX 體驗優化報告](docs/reviews/2026-09-19-chat-uiux-revi
 before changing chat interaction, accessibility, media recovery, scrolling, or
 responsive layout.
 
+Read [寵物與聊天訊息泡泡互動設計參考指南](docs/references/pet-bubble-interaction-reference.md)
+when ideating, designing, or implementing pet-message bubble interactions,
+physical/emotional reactions, lifecycle animations, gamification, or Flutter
+overlay architecture.
+
 Before commit, follow [Git Commit Gate](docs/git-commit-gate.md): peer review
 first, then run the automated gate. Repository hook lives at `.githooks`.
 
