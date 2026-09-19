@@ -13,6 +13,7 @@ class FirebaseMessageMapper {
   static MessageDelta fromDocumentChange(
     DocumentChange<Map<String, dynamic>> change, {
     String? currentUid,
+    MessageAddedOrigin addedOrigin = MessageAddedOrigin.live,
   }) {
     final type = switch (change.type) {
       DocumentChangeType.added => FirebaseDocumentChangeType.added,
@@ -24,6 +25,7 @@ class FirebaseMessageMapper {
       documentId: change.doc.id,
       data: change.doc.data() ?? const {},
       currentUid: currentUid,
+      addedOrigin: addedOrigin,
     );
   }
 
@@ -32,6 +34,7 @@ class FirebaseMessageMapper {
     required String documentId,
     required Map<String, dynamic> data,
     String? currentUid,
+    MessageAddedOrigin addedOrigin = MessageAddedOrigin.live,
   }) {
     if (changeType == FirebaseDocumentChangeType.removed) {
       return MessageDelta.removed(
@@ -43,7 +46,10 @@ class FirebaseMessageMapper {
 
     final message = _message(documentId, data, currentUid: currentUid);
     return switch (changeType) {
-      FirebaseDocumentChangeType.added => MessageDelta.added(message),
+      FirebaseDocumentChangeType.added => MessageDelta.added(
+        message,
+        origin: addedOrigin,
+      ),
       FirebaseDocumentChangeType.modified => MessageDelta.modified(message),
       FirebaseDocumentChangeType.removed => throw StateError('unreachable'),
     };

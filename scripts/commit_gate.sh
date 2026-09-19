@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Git hooks export worktree-specific variables. Flutter also invokes Git to
+# resolve its SDK version, so those variables would make it inspect this app.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE
+
 echo '[commit-gate] flutter analyze'
 flutter analyze
 

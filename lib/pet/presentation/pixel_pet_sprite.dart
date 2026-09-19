@@ -22,6 +22,28 @@ String petAssetFor(PetType petType, PetState state, int frameIndex) {
     case PetState.observe:
       final idx = frameIndex.abs() % 2;
       return 'assets/pets/${prefix}_observe_$idx.png';
+    case PetState.catStalk:
+      final idx = frameIndex.abs() % 4;
+      return petType == PetType.cat
+          ? 'assets/pets/cat_stalk_$idx.png'
+          : 'assets/pets/${prefix}_walk_$idx.png';
+    case PetState.pawTest:
+      if (petType == PetType.cat) {
+        final idx = frameIndex.abs() % 6;
+        return 'assets/pets/cat_paw_test_$idx.png';
+      }
+      final idx = frameIndex.abs() % 2;
+      return 'assets/pets/${prefix}_observe_$idx.png';
+    case PetState.dogProbe:
+      final idx = frameIndex.abs() % 6;
+      return petType == PetType.corgi
+          ? 'assets/pets/corgi_novel_probe_$idx.png'
+          : 'assets/pets/${prefix}_observe_${idx % 2}.png';
+    case PetState.parrotProbe:
+      final idx = frameIndex.abs() % 6;
+      return petType == PetType.parrot
+          ? 'assets/pets/parrot_novel_probe_$idx.png'
+          : 'assets/pets/${prefix}_observe_${idx % 2}.png';
   }
 }
 
@@ -59,6 +81,16 @@ class CorgiSpriteSheet {
         col = (frameIndex.abs() % 2) * 2;
         break;
       case PetState.observe:
+        row = 4;
+        col = (frameIndex.abs() % 2) * 2;
+        break;
+      case PetState.catStalk:
+        row = 1;
+        col = frameIndex.abs() % 4;
+        break;
+      case PetState.pawTest:
+      case PetState.dogProbe:
+      case PetState.parrotProbe:
         row = 4;
         col = (frameIndex.abs() % 2) * 2;
         break;

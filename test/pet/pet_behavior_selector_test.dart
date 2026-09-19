@@ -129,6 +129,7 @@ void main() {
     expect(catText?.action, PetBehaviorAction.headBuntRub);
     expect(catEmoji?.action, PetBehaviorAction.pounce);
     expect(catMedia?.action, PetBehaviorAction.sniffWhiskerScan);
+    expect(catMedia?.capability, PetBehaviorCapability.degraded);
     expect(parrotText?.action, PetBehaviorAction.beakTouch);
     expect(parrotEmoji?.action, PetBehaviorAction.flyFlap);
     expect(parrotMedia?.action, PetBehaviorAction.headTiltEyeFocus);
@@ -163,9 +164,43 @@ void main() {
     expect(corgi?.action, PetBehaviorAction.approachArc);
     expect(cat?.action, PetBehaviorAction.approachLowSilent);
     expect(parrot?.action, PetBehaviorAction.approachSideways);
-    expect(corgi?.capability, PetBehaviorCapability.unsupported);
-    expect(cat?.capability, PetBehaviorCapability.unsupported);
-    expect(parrot?.capability, PetBehaviorCapability.unsupported);
+    expect(corgi?.capability, PetBehaviorCapability.degraded);
+    expect(cat?.capability, PetBehaviorCapability.degraded);
+    expect(parrot?.capability, PetBehaviorCapability.degraded);
+  });
+
+  test('new media arrival selects species-specific native investigation', () {
+    final corgi = selector.select(
+      _stimulus(
+        PetType.corgi,
+        PetStimulusType.newMessageBubble,
+        WorldObjectKind.animatedToy,
+        PetNormalizedContentKind.gif,
+      ),
+    );
+    final cat = selector.select(
+      _stimulus(
+        PetType.cat,
+        PetStimulusType.newMessageBubble,
+        WorldObjectKind.animatedToy,
+        PetNormalizedContentKind.image,
+      ),
+    );
+    final parrot = selector.select(
+      _stimulus(
+        PetType.parrot,
+        PetStimulusType.newMessageBubble,
+        WorldObjectKind.animatedToy,
+        PetNormalizedContentKind.video,
+      ),
+    );
+
+    expect(corgi?.action, PetBehaviorAction.novelObjectNoseProbe);
+    expect(cat?.action, PetBehaviorAction.pawTest);
+    expect(parrot?.action, PetBehaviorAction.beakProbe);
+    expect(corgi?.capability, PetBehaviorCapability.native);
+    expect(cat?.capability, PetBehaviorCapability.native);
+    expect(parrot?.capability, PetBehaviorCapability.native);
   });
 
   test('user tap and new-message candidates remain source-isolated', () {

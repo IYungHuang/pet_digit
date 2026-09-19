@@ -344,7 +344,9 @@ void main() {
       switch (change) {
         case 'removed':
           controller.setMessageBubbleTargets([]);
-          controller.setMessageBubbleTargets([_message()]);
+          controller.setMessageTargets([
+            PetMessageTargetFactory.fromDomainMessage(_message()),
+          ]);
         case 'content':
           controller.setMessageBubbleTargets([_message(text: '🎾')]);
         case 'payload':
@@ -435,7 +437,7 @@ void main() {
     expect(controller.currentAction, PetActionType.none);
   });
 
-  test('ignored retry is consumed after exactly one attempt', () {
+  test('pending retry is consumed after exactly one successful attempt', () {
     final controller = _RecordingController()
       ..setMessageBubbleTargets([_message()]);
     controller.dispatch(
@@ -448,12 +450,12 @@ void main() {
     expect(controller.results.single.reason, 'target bounds are not ready');
     controller.updateObjectBounds({'client': _bounds});
     expect(controller.results, hasLength(2));
-    expect(controller.results.last.reason, contains('unsupported action'));
+    expect(controller.results.last.reason, contains('approach fallback'));
     controller.updateObjectBounds({'client': _bounds});
     controller.updateObjectBounds({'client': _bounds});
     expect(controller.results, hasLength(2));
-    expect(controller.currentAction, PetActionType.none);
-    expect(controller.activeTarget, isNull);
+    expect(controller.currentAction, PetActionType.observeTarget);
+    expect(controller.activeTarget?.id, 'client');
   });
 
   for (final change in ['species', 'content', 'payload']) {

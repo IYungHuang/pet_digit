@@ -70,7 +70,18 @@ class PetConfig {
   }
 }
 
-enum PetState { idle, walk, run, jump, observe, pounce }
+enum PetState {
+  idle,
+  walk,
+  run,
+  jump,
+  observe,
+  pounce,
+  catStalk,
+  pawTest,
+  dogProbe,
+  parrotProbe,
+}
 
 enum WorldObjectKind { platform, emojiToy, animatedToy }
 
@@ -103,6 +114,12 @@ abstract interface class PetBehaviorRuntime {
   void startChaseEmoji(PetInteractable target, {required Object? payload});
 
   void startInspectGif(PetInteractable target, {required Object? payload});
+
+  void startPawTest(PetInteractable target);
+
+  void startDogProbe(PetInteractable target);
+
+  void startParrotProbe(PetInteractable target);
 
   void startObserveTarget(PetInteractable target, {required bool walkToward});
 }

@@ -70,6 +70,7 @@ enum PetBehaviorAction {
   approachArc,
   approachStopStart,
   sniffBubble,
+  novelObjectNoseProbe,
   circleSniff,
   headTiltFocus,
   freezeWeightShift,
@@ -167,6 +168,7 @@ class PetBehaviorCatalog {
         PetBehaviorAction.approachArc,
         PetBehaviorAction.approachStopStart,
         PetBehaviorAction.sniffBubble,
+        PetBehaviorAction.novelObjectNoseProbe,
         PetBehaviorAction.circleSniff,
         PetBehaviorAction.headTiltFocus,
         PetBehaviorAction.freezeWeightShift,
@@ -404,6 +406,7 @@ class PetBehaviorCatalog {
       supportedStimulusTypes: [PetStimulusType.newMessageBubble],
       supportedContentKinds: [PetNormalizedContentKind.text],
       supportedTargetKinds: [WorldObjectKind.platform],
+      capability: PetBehaviorCapability.degraded,
     ),
     PetBehaviorAction.approachStopStart: PetActionDefinition(
       action: PetBehaviorAction.approachStopStart,
@@ -412,6 +415,7 @@ class PetBehaviorCatalog {
       supportedStimulusTypes: [PetStimulusType.newMessageBubble],
       supportedContentKinds: [PetNormalizedContentKind.text],
       supportedTargetKinds: [WorldObjectKind.platform],
+      capability: PetBehaviorCapability.degraded,
     ),
     PetBehaviorAction.sniffBubble: PetActionDefinition(
       action: PetBehaviorAction.sniffBubble,
@@ -425,6 +429,19 @@ class PetBehaviorCatalog {
       ],
       supportedTargetKinds: [WorldObjectKind.animatedToy],
       capability: PetBehaviorCapability.degraded,
+    ),
+    PetBehaviorAction.novelObjectNoseProbe: PetActionDefinition(
+      action: PetBehaviorAction.novelObjectNoseProbe,
+      category: PetBehaviorCategory.investigate,
+      animationKey: 'novel_object_nose_probe',
+      supportedStimulusTypes: [PetStimulusType.newMessageBubble],
+      supportedContentKinds: [
+        PetNormalizedContentKind.image,
+        PetNormalizedContentKind.gif,
+        PetNormalizedContentKind.video,
+      ],
+      supportedTargetKinds: [WorldObjectKind.animatedToy],
+      capability: PetBehaviorCapability.native,
     ),
     PetBehaviorAction.circleSniff: PetActionDefinition(
       action: PetBehaviorAction.circleSniff,
@@ -462,6 +479,7 @@ class PetBehaviorCatalog {
       supportedStimulusTypes: [PetStimulusType.newMessageBubble],
       supportedContentKinds: [PetNormalizedContentKind.text],
       supportedTargetKinds: [WorldObjectKind.platform],
+      capability: PetBehaviorCapability.degraded,
     ),
     PetBehaviorAction.approachPauseRetreat: PetActionDefinition(
       action: PetBehaviorAction.approachPauseRetreat,
@@ -485,6 +503,14 @@ class PetBehaviorCatalog {
       action: PetBehaviorAction.pawTest,
       category: PetBehaviorCategory.investigate,
       animationKey: 'paw_test',
+      supportedStimulusTypes: [PetStimulusType.newMessageBubble],
+      supportedContentKinds: [
+        PetNormalizedContentKind.image,
+        PetNormalizedContentKind.gif,
+        PetNormalizedContentKind.video,
+      ],
+      supportedTargetKinds: [WorldObjectKind.animatedToy],
+      capability: PetBehaviorCapability.native,
     ),
     PetBehaviorAction.orientEarsTail: PetActionDefinition(
       action: PetBehaviorAction.orientEarsTail,
@@ -513,6 +539,7 @@ class PetBehaviorCatalog {
       supportedStimulusTypes: [PetStimulusType.newMessageBubble],
       supportedContentKinds: [PetNormalizedContentKind.text],
       supportedTargetKinds: [WorldObjectKind.platform],
+      capability: PetBehaviorCapability.degraded,
     ),
     PetBehaviorAction.leanForwardPause: PetActionDefinition(
       action: PetBehaviorAction.leanForwardPause,
@@ -536,6 +563,14 @@ class PetBehaviorCatalog {
       action: PetBehaviorAction.beakProbe,
       category: PetBehaviorCategory.investigate,
       animationKey: 'beak_probe',
+      supportedStimulusTypes: [PetStimulusType.newMessageBubble],
+      supportedContentKinds: [
+        PetNormalizedContentKind.image,
+        PetNormalizedContentKind.gif,
+        PetNormalizedContentKind.video,
+      ],
+      supportedTargetKinds: [WorldObjectKind.animatedToy],
+      capability: PetBehaviorCapability.native,
     ),
     PetBehaviorAction.crestBodyScan: PetActionDefinition(
       action: PetBehaviorAction.crestBodyScan,
@@ -586,6 +621,24 @@ class PetBehaviorCatalog {
       action: PetBehaviorAction.approachSideways,
       petType: PetType.parrot,
       priority: 10,
+    ),
+    PetBehaviorTrigger(
+      stimulus: PetStimulusType.newMessageBubble,
+      action: PetBehaviorAction.novelObjectNoseProbe,
+      petType: PetType.corgi,
+      priority: 20,
+    ),
+    PetBehaviorTrigger(
+      stimulus: PetStimulusType.newMessageBubble,
+      action: PetBehaviorAction.pawTest,
+      petType: PetType.cat,
+      priority: 20,
+    ),
+    PetBehaviorTrigger(
+      stimulus: PetStimulusType.newMessageBubble,
+      action: PetBehaviorAction.beakProbe,
+      petType: PetType.parrot,
+      priority: 20,
     ),
   ];
 

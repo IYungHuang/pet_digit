@@ -1,9 +1,14 @@
 import '../domain/chat_message.dart';
 
+enum MessageAddedOrigin { initialSnapshot, live, localOptimistic }
+
 sealed class MessageDelta {
   const MessageDelta();
 
-  const factory MessageDelta.added(ChatMessage message) = MessageAdded;
+  const factory MessageDelta.added(
+    ChatMessage message, {
+    MessageAddedOrigin origin,
+  }) = MessageAdded;
 
   const factory MessageDelta.modified(ChatMessage message) = MessageModified;
 
@@ -15,9 +20,10 @@ sealed class MessageDelta {
 }
 
 final class MessageAdded extends MessageDelta {
-  const MessageAdded(this.message);
+  const MessageAdded(this.message, {this.origin = MessageAddedOrigin.live});
 
   final ChatMessage message;
+  final MessageAddedOrigin origin;
 }
 
 final class MessageModified extends MessageDelta {

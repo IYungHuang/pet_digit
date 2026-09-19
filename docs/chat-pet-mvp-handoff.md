@@ -8,7 +8,7 @@ This section is the current pet runtime handoff. The original 2026-09-18 report 
 
 `PetMessageTargetFactory` adapts both Freezed chat messages and legacy demo messages into one `PetMessageTarget` collection. Text becomes a platform, emoji-only text becomes an emoji toy, and image/GIF/video becomes an animated target. Normalized content and payload travel with the target; the executor never guesses payload from a concrete message class.
 
-`PetBehaviorNormalizer` creates an explicit `PetBehaviorStimulus`. The pure `PetBehaviorSelector` filters species profiles and trigger metadata by stimulus, content, and target kind, using catalog order to break priority ties. `PetBehaviorExecutor` then invokes existing controller transitions. `PetActionType` still owns jump, chase, inspect, and observe sequences; catalog names and animation keys do not create new visual animations.
+`PetBehaviorNormalizer` creates an explicit `PetBehaviorStimulus`. The pure `PetBehaviorSelector` filters species profiles and trigger metadata by stimulus, content, and target kind, using catalog order to break priority ties. `PetBehaviorExecutor` then invokes controller transitions. `PetActionType` owns jump, chase, inspect, observe, cat paw-probe, dog nose-probe, and parrot beak-probe sequences; catalog names and animation keys alone do not create visual animations.
 
 Catalog capability (`native`, `degraded`, `unsupported`) and execution outcome (`executed`, `fallback`, `ignored`) are separate contracts:
 
@@ -18,11 +18,18 @@ Catalog capability (`native`, `degraded`, `unsupported`) and execution outcome (
 | Text tap / cat, parrot | `headBuntRub`, `beakTouch` | degraded | `fallback`: platform jump |
 | Emoji tap / corgi, cat | `runChase`, `pounce` | native | `executed`: payload-aware emoji chase |
 | Emoji tap / parrot | `flyFlap` | degraded | `fallback`: emoji chase; no flight animation |
-| Media tap / corgi, cat, parrot | `sniffBubble`, `sniffWhiskerScan`, `headTiltEyeFocus` | degraded | `fallback`: existing inspect/observe sequence |
-| New text / corgi, cat, parrot | `approachArc`, `approachLowSilent`, `approachSideways` | unsupported | `ignored`: no equivalent motion, active tap runtime preserved |
-| New emoji or media / any species | No matching new-message candidate | — | `ignored`: no selection; never treated as a tap |
+| Media tap / corgi | `sniffBubble` | degraded | `fallback`: legacy GIF inspect sequence |
+| Media tap / cat | `sniffWhiskerScan` | degraded | `fallback`: legacy GIF inspect sequence |
+| Media tap / parrot | `headTiltEyeFocus` | degraded | `fallback`: existing inspect/observe sequence |
+| New text / corgi, cat, parrot | `approachArc`, `approachLowSilent`, `approachSideways` | degraded | `fallback`: light walk-toward observation |
+| New media / corgi | `novelObjectNoseProbe` | native | `executed`: dog novel-object probe |
+| New media / cat | `pawTest` | native | `executed`: cat novel-object probe |
+| New media / parrot | `beakProbe` | native | `executed`: side-step, monocular inspection, beak touch |
+| New emoji / any species | No matching new-message candidate | — | `ignored`: no selection; never treated as a tap |
 
-`approachStopStart` is also unsupported and follows `approachArc` at equal priority. `flyBack` is ignored, never substituted with walking. Executor adapters for `hidePeek`, `beakProbe`, and `beakManipulate` can explicitly fall back to observation when invoked directly; these actions have no eligible message triggers and no native animation. Other unenabled catalog actions remain outside automatic message selection. This integration does not claim complete animation coverage for the catalog.
+`approachStopStart` follows `approachArc` at equal priority and shares the light-approach fallback. `flyBack` is ignored, never substituted with walking. `hidePeek` and `beakManipulate` remain observation fallbacks without native animation. Novel-object actions are arrival-only, so they do not replace established media-tap behavior. Other unenabled catalog actions remain outside automatic message selection.
+
+Native novel-object sequences use dedicated generated sprite assets: four cat low-stalk frames, six corgi sniff/nose-probe frames, six parrot side-step/eye-focus/beak-probe frames, plus six cat paw-probe frames. Cat motion uses eased two-stage stalking with a full stop; dog approach follows an arc; parrot approaches by side-step. Probe impacts drive the existing bubble spring.
 
 ### Identity, geometry, and bounded retry
 
@@ -31,24 +38,20 @@ Catalog capability (`native`, `degraded`, `unsupported`) and execution outcome (
 - Dispatch rejects stale species, source identity, content kind, target kind, or payload. Room changes cannot reuse a stale message event from another room.
 - Geometry is measured from message widgets. An initial zero rectangle is not ready geometry. Layout updates also refresh airborne landing coordinates and landed platform position.
 - An unmeasured selected target returns `ignored`. With no running action, only one pending stimulus is retained; the latest eligible event replaces that slot. There is no event queue. While an action runs, an unready arrival does not queue or interrupt it.
+- A ready `newMessageBubble` also cannot interrupt an active action. User taps remain explicit and may replace the current action.
 - `updateObjectBounds()` retries the pending stimulus at most once after its target is measured, revalidating species, source, target data, and selection. It clears the slot before execution, including unsupported results. Removal, source/content changes, room changes, or species changes invalidate pending work.
 
-### New-message integration and provenance limitation
+### New-message delta integration
 
-`interact(id)` emits only `userTap`; normalized explicit `newMessageBubble` events enter through `dispatch(stimulus)` after target installation. The current `roomMessagesProvider` supplies snapshots without live/history provenance, so `setMessageBubbleTargets(messages, roomId: activeRoomId)` provides a narrow snapshot adapter for ChatShell:
+`interact(id)` emits only `userTap`. `setMessageBubbleTargets()` now only installs and reconciles snapshots; it never guesses whether an item is live. `messageDeltaProvider` forwards repository deltas to ChatShell, which sends `MessageAdded` events to `handleMessageAdded()`.
 
-1. `loadRoom()` resets arrival tracking. The first domain snapshot is a baseline and emits no events, including an empty baseline.
-2. Later snapshots compare room-scoped canonical IDs and stable source identities with installed targets. Rebuilds, edits, reorderings, and client-to-server acknowledgement do not count as arrivals.
-3. The adapter installs and reconciles all targets before dispatching each addition as `newMessageBubble`, returning one execution result per addition. Room changes establish a new baseline. No species logic is added to ChatShell.
-4. `setMessageTargets()` remains a silent installation path for callers that already know a snapshot is history. Explicit event producers can use it followed by normalized `dispatch()` calls.
-
-Limitation: additions after the baseline can be delayed history, reconnect backfill, or messages removed and later reintroduced. Snapshot data cannot distinguish these from live messages. An empty first snapshot followed by delayed history has the same limitation. Initial nonempty room history is never replayed, and no history-wide trigger or chat sync rewrite was introduced. A future provenance-bearing message event should replace this inference.
+`MessageAddedOrigin.initialSnapshot` marks Firebase initial and reconnect snapshots as history. The initial phase remains closed to behavior through cache snapshots and ends only after the first server-backed snapshot. Remote `live` additions may dispatch immediately; local optimistic sends wait for their final `sent` modification so upload URL churn cannot invalidate the pending action. Stable `(roomId, clientId)` dedupe prevents acknowledgement, rebuild, removal/reintroduction, and reconnect replay from retriggering behavior. An unmeasured live delta enters the existing bounded pending slot and executes after widget geometry arrives.
 
 ### Verification and scope
 
-Task 6 integration tests cover species-specific arrival selection, preservation of running taps for all three species, independent canonical/source targets, baseline and room reset, acknowledgement/reordering, and a single consumed bounds retry. Existing controller and ChatShell tap tests remain part of verification. See `.superpowers/sdd/2026-09-19-pet-behavior-runtime/task-6-report.md` for RED/GREEN and final command results.
+Integration tests cover delta provenance, reconnect/backfill/reintroduction suppression, species-specific arrival selection, finite text observation, active-tap preservation, room reset, and bounded geometry retry. Existing controller and ChatShell tap tests remain part of verification.
 
-No packages, animation assets, or backend changes are included. New native approach animations remain future work.
+No packages or backend changes are included.
 
 ---
 

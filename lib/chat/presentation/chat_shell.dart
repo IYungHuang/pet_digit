@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../chat/data/fake_chat_repository.dart';
+import '../../chat/application/message_delta.dart';
 import '../../chat/domain/chat_message.dart';
 import '../../chat/domain/chat_models.dart' show ChatRoom;
 import '../../chat/domain/media_policy.dart';
@@ -43,6 +44,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
   var _lastMessageCount = 0;
   var _isNearBottom = true;
   var _hasNewMessages = false;
+  var _bubbleBoundsSyncScheduled = false;
   final Set<String> _retryingClientIds = <String>{};
 
   ChatRoom get _room => FakeChatRepository.roomById(_activeRoomId);
@@ -51,7 +53,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
   void initState() {
     super.initState();
     _world.loadRoom(_room);
-    _scrollController.addListener(_syncBubbleBounds);
+    _scrollController.addListener(_scheduleBubbleBoundsSync);
     _scrollController.addListener(_handleScroll);
     _composerController.addListener(_saveDraft);
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncBubbleBounds());
@@ -66,6 +68,24 @@ class _ChatShellState extends ConsumerState<ChatShell> {
 
   void _saveDraft() {
     _roomDrafts[_activeRoomId] = _composerController.text;
+  }
+
+  void _handlePetMessageDelta(MessageDelta delta) {
+    if (delta case MessageAdded(
+      :final message,
+      :final origin,
+    ) when message.roomId == _activeRoomId) {
+      if (origin == MessageAddedOrigin.localOptimistic) return;
+      _world.handleMessageAdded(
+        message,
+        isLive: origin != MessageAddedOrigin.initialSnapshot,
+      );
+    } else if (delta case MessageModified(:final message)
+        when message.roomId == _activeRoomId &&
+            message.isMine &&
+            message.status == MessageDeliveryStatus.sent) {
+      _world.handleMessageAdded(message, isLive: true);
+    }
   }
 
   void _handleScroll() {
@@ -86,6 +106,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
   void _syncBubbleBounds() {
     final stackBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
     if (stackBox == null || !stackBox.hasSize) return;
+    _world.updateViewportSize(stackBox.size);
 
     final boundsMap = <String, Rect>{};
     for (final entry in _cardKeys.entries) {
@@ -97,6 +118,16 @@ class _ChatShellState extends ConsumerState<ChatShell> {
       }
     }
     if (boundsMap.isNotEmpty) _world.updateObjectBounds(boundsMap);
+  }
+
+  void _scheduleBubbleBoundsSync() {
+    if (_bubbleBoundsSyncScheduled) return;
+    _bubbleBoundsSyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _bubbleBoundsSyncScheduled = false;
+      if (mounted) _syncBubbleBounds();
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void _selectRoom(String id) {
@@ -232,6 +263,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        _scheduleBubbleBoundsSync();
         _isNearBottom = true;
         if (_hasNewMessages && mounted) setState(() => _hasNewMessages = false);
       }
@@ -290,6 +322,9 @@ class _ChatShellState extends ConsumerState<ChatShell> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(messageDeltaProvider, (_, next) {
+      next.whenData(_handlePetMessageDelta);
+    });
     final messageState = ref.watch(roomMessagesProvider(_activeRoomId));
     final connectionState = ref.watch(messageConnectionStateProvider);
     final messages = messageState.asData?.value;
@@ -670,59 +705,68 @@ class _MessageCard extends StatelessWidget {
         onTap: onTap,
         child: GestureDetector(
           onTap: onTap,
-          child: AnimatedBuilder(
-            animation: controller.springNotifier,
-            builder: (context, child) {
-              final deflection = controller.getBubbleDeflection(
-                PetMessageTargetFactory.domainMessageId(message),
-              );
-              final scaleY = (1.0 - (deflection / 240.0)).clamp(0.85, 1.15);
-              final scaleX = (1.0 + (deflection / 340.0)).clamp(0.90, 1.15);
-              return Transform.translate(
-                offset: Offset(0, deflection),
-                child: Transform(
-                  transform: Matrix4.diagonal3Values(scaleX, scaleY, 1.0),
-                  alignment: Alignment.bottomCenter,
-                  child: child,
-                ),
-              );
-            },
-            child: Container(
-              key: cardKey,
-              margin: const EdgeInsets.only(bottom: 14),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              constraints: const BoxConstraints(maxWidth: 300),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: BorderRadius.circular(18).copyWith(
-                  bottomRight: message.isMine ? const Radius.circular(4) : null,
-                  bottomLeft: !message.isMine ? const Radius.circular(4) : null,
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x10000000),
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
+          child: RepaintBoundary(
+            key: cardKey,
+            child: AnimatedBuilder(
+              animation: controller.springNotifier,
+              builder: (context, child) {
+                final deflection = controller.getBubbleDeflection(
+                  PetMessageTargetFactory.domainMessageId(message),
+                );
+                final scaleY = (1.0 - (deflection / 240.0)).clamp(0.85, 1.15);
+                final scaleX = (1.0 + (deflection / 340.0)).clamp(0.90, 1.15);
+                return Transform.translate(
+                  offset: Offset(0, deflection),
+                  child: Transform(
+                    transform: Matrix4.diagonal3Values(scaleX, scaleY, 1.0),
+                    alignment: Alignment.bottomCenter,
+                    child: child,
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _MessageContentView(
-                    message: message,
-                    textColor: textColor,
-                    onOpenImagePreview: onOpenImagePreview,
-                    onOpenVideoPlayer: onOpenVideoPlayer,
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                constraints: const BoxConstraints(maxWidth: 300),
+                decoration: BoxDecoration(
+                  color: bubbleColor,
+                  borderRadius: BorderRadius.circular(18).copyWith(
+                    bottomRight: message.isMine
+                        ? const Radius.circular(4)
+                        : null,
+                    bottomLeft: !message.isMine
+                        ? const Radius.circular(4)
+                        : null,
                   ),
-                  if (message.status != MessageDeliveryStatus.sent)
-                    _MessageStatus(
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x10000000),
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _MessageContentView(
                       message: message,
                       textColor: textColor,
-                      onRetry: onRetry,
-                      retrying: retrying,
+                      onOpenImagePreview: onOpenImagePreview,
+                      onOpenVideoPlayer: onOpenVideoPlayer,
                     ),
-                ],
+                    if (message.status != MessageDeliveryStatus.sent)
+                      _MessageStatus(
+                        message: message,
+                        textColor: textColor,
+                        onRetry: onRetry,
+                        retrying: retrying,
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

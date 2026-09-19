@@ -29,9 +29,10 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
   @override
   void initState() {
     super.initState();
-    _ticker = AnimationController(vsync: this, duration: const Duration(days: 1))
-      ..addListener(_onTick)
-      ..repeat();
+    _ticker =
+        AnimationController(vsync: this, duration: const Duration(days: 1))
+          ..addListener(_onTick)
+          ..repeat();
   }
 
   void _onTick() {
@@ -106,8 +107,9 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
             ),
 
             // 3. Render ground particles (dust puffs under feet)
-            for (final particle in widget.controller.particles
-                .where((p) => p.kind == ParticleKind.dust))
+            for (final particle in widget.controller.particles.where(
+              (p) => p.kind == ParticleKind.dust,
+            ))
               Positioned(
                 left: particle.position.dx - particle.currentSize / 2,
                 top: particle.position.dy - particle.currentSize / 2,
@@ -151,8 +153,9 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
             ),
 
             // 6. Render floating particles (hearts, notes, feathers above pet)
-            for (final particle in widget.controller.particles
-                .where((p) => p.kind != ParticleKind.dust))
+            for (final particle in widget.controller.particles.where(
+              (p) => p.kind != ParticleKind.dust,
+            ))
               Positioned(
                 left: particle.position.dx - particle.currentSize / 2,
                 top: particle.position.dy - particle.currentSize / 2,
@@ -164,7 +167,10 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
 
             // 7. Status reaction badge (pounce! / watching)
             if (widget.controller.state == PetState.pounce ||
-                widget.controller.state == PetState.observe)
+                widget.controller.state == PetState.observe ||
+                widget.controller.state == PetState.pawTest ||
+                widget.controller.state == PetState.dogProbe ||
+                widget.controller.state == PetState.parrotProbe)
               Positioned(
                 left: widget.controller.position.dx,
                 top: (widget.controller.position.dy - 26).clamp(4, 1000),
@@ -179,9 +185,14 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
                       vertical: 4,
                     ),
                     child: Text(
-                      widget.controller.state == PetState.pounce
-                          ? widget.controller.petConfig.pounceLabel
-                          : widget.controller.petConfig.observeLabel,
+                      switch (widget.controller.state) {
+                        PetState.pounce =>
+                          widget.controller.petConfig.pounceLabel,
+                        PetState.pawTest => 'tap tap',
+                        PetState.dogProbe => 'sniff',
+                        PetState.parrotProbe => 'inspect',
+                        _ => widget.controller.petConfig.observeLabel,
+                      },
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 11,

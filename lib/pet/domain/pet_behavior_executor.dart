@@ -69,6 +69,17 @@ class PetBehaviorExecutor {
         }
         return _observeFallback(selection, target, 'emoji target required');
       case PetBehaviorAction.sniffBubble:
+        if (target.kind == WorldObjectKind.animatedToy) {
+          _runtime.startInspectGif(target, payload: target.payload);
+          return _fallback(selection, target, 'observe fallback');
+        }
+        return _observeFallback(selection, target, 'media target required');
+      case PetBehaviorAction.novelObjectNoseProbe:
+        if (target.kind == WorldObjectKind.animatedToy) {
+          _runtime.startDogProbe(target);
+          return _executed(selection, target, 'native dog media probe');
+        }
+        return _observeFallback(selection, target, 'media target required');
       case PetBehaviorAction.headTiltFocus:
       case PetBehaviorAction.sniffWhiskerScan:
       case PetBehaviorAction.headTiltEyeFocus:
@@ -81,6 +92,11 @@ class PetBehaviorExecutor {
         _runtime.startObserveTarget(target, walkToward: true);
         return _fallback(selection, target, 'walk-toward observe fallback');
       case PetBehaviorAction.pawTest:
+        if (target.kind == WorldObjectKind.animatedToy) {
+          _runtime.startPawTest(target);
+          return _executed(selection, target, 'native paw test');
+        }
+        return _observeFallback(selection, target, 'media target required');
       case PetBehaviorAction.batPounce:
         if (target.kind == WorldObjectKind.emojiToy) {
           _runtime.startChaseEmoji(target, payload: target.payload);
@@ -88,19 +104,30 @@ class PetBehaviorExecutor {
         }
         return _observeFallback(selection, target, 'emoji target required');
       case PetBehaviorAction.hidePeek:
-      case PetBehaviorAction.beakProbe:
       case PetBehaviorAction.beakManipulate:
         return _observeFallback(
           selection,
           target,
           'observe fallback; no equivalent runtime',
         );
+      case PetBehaviorAction.beakProbe:
+        if (target.kind == WorldObjectKind.animatedToy) {
+          _runtime.startParrotProbe(target);
+          return _executed(selection, target, 'native parrot media probe');
+        }
+        return _observeFallback(selection, target, 'media target required');
       case PetBehaviorAction.flyBack:
         return _ignored(
           selection,
           target,
           'flyBack has no safe runtime mapping',
         );
+      case PetBehaviorAction.approachArc:
+      case PetBehaviorAction.approachStopStart:
+      case PetBehaviorAction.approachLowSilent:
+      case PetBehaviorAction.approachSideways:
+        _runtime.startObserveTarget(target, walkToward: true);
+        return _fallback(selection, target, 'light approach fallback');
       default:
         return _ignored(
           selection,

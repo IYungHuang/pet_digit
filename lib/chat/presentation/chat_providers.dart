@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../application/media_picker_service.dart';
+import '../application/message_delta.dart';
 import '../data/fake/fake_media_upload_data_source.dart';
 import '../data/fake/fake_message_event_source.dart';
 import '../data/fake/fake_message_remote_data_source.dart';
@@ -165,6 +166,10 @@ final roomMessagesProvider = StreamProvider.autoDispose
         yield messages;
       }
     });
+
+final messageDeltaProvider = StreamProvider.autoDispose<MessageDelta>((ref) {
+  return ref.watch(chatRepositoryProvider).watchDeltas();
+});
 
 final sendMessageProvider = Provider<SendMessage>((ref) {
   final repository = ref.watch(chatRepositoryProvider);

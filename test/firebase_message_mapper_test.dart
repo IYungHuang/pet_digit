@@ -24,11 +24,25 @@ void main() {
     );
 
     expect(delta, isA<MessageAdded>());
-    final message = (delta as MessageAdded).message;
+    final added = delta as MessageAdded;
+    expect(added.origin, MessageAddedOrigin.live);
+    final message = added.message;
     expect(message.serverId, 'message-1');
     expect(message.clientId, 'client-1');
     expect(message.content, const MessageContent.text(text: 'hello'));
     expect(message.isMine, isTrue);
+  });
+
+  test('marks first Firestore snapshot additions as history', () {
+    final delta = FirebaseMessageMapper.fromDocumentMap(
+      changeType: FirebaseDocumentChangeType.added,
+      documentId: 'message-history',
+      data: {..._imageData(), 'kind': 'text', 'text': 'history'},
+      currentUid: 'other-user',
+      addedOrigin: MessageAddedOrigin.initialSnapshot,
+    );
+
+    expect((delta as MessageAdded).origin, MessageAddedOrigin.initialSnapshot);
   });
 
   test('maps modified and removed changes without exposing Firestore DTOs', () {

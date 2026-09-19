@@ -15,6 +15,7 @@ import 'package:chat_pet_mvp/chat/domain/message_status.dart';
 import 'package:chat_pet_mvp/chat/presentation/chat_providers.dart';
 import 'package:chat_pet_mvp/chat/presentation/chat_shell.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_world.dart';
+import 'package:chat_pet_mvp/pet/domain/pet_world_controller.dart';
 import 'package:chat_pet_mvp/pet/presentation/pet_world_overlay.dart';
 
 void main() {
@@ -50,6 +51,25 @@ void main() {
     await tester.pump();
     expect(overlay.controller.state, PetState.observe);
     expect(find.text('watching'), findsOneWidget);
+  });
+
+  testWidgets('tapping GIF moves pet beside its measured bubble', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const ChatPetApp());
+    await _pumpChat(tester);
+
+    await tester.tap(find.text('Corgi dance.gif'));
+    await tester.pump(const Duration(milliseconds: 1900));
+
+    final overlay = tester.widget<PetWorldOverlay>(
+      find.byType(PetWorldOverlay),
+    );
+    final bounds = overlay.controller.activeTarget!.bounds;
+    expect(
+      overlay.controller.position,
+      Offset(bounds.right + 8, bounds.bottom - 52),
+    );
   });
 
   testWidgets('server-backed message card measures its canonical pet target', (
@@ -281,8 +301,32 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('圖片（demo）'));
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, -800));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    final overlay = tester.widget<PetWorldOverlay>(
+      find.byType(PetWorldOverlay),
+    );
+    expect(overlay.controller.currentAction, PetActionType.dogProbe);
+
+    final card = find.bySemanticsLabel(RegExp(r'^You：圖片訊息'));
+    final cardRect = tester.getRect(card);
+    final overlayOrigin = tester.getTopLeft(find.byType(PetWorldOverlay));
+    final measuredBounds = overlay.controller.activeTarget!.bounds;
+    final timeline = tester.state<ScrollableState>(
+      find.descendant(
+        of: find.byType(ListView).last,
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(timeline.position.pixels, greaterThan(0));
+    expect(measuredBounds.left, closeTo(cardRect.left - overlayOrigin.dx, 1));
+    expect(measuredBounds.top, closeTo(cardRect.top - overlayOrigin.dy, 1));
+
+    await tester.pump(const Duration(milliseconds: 1200));
+    final liveBounds = overlay.controller.activeTarget!.bounds;
+    expect(
+      overlay.controller.position,
+      Offset(liveBounds.left - 72, liveBounds.bottom - 52),
+    );
 
     expect(find.text('photo.jpg'), findsOneWidget);
   });

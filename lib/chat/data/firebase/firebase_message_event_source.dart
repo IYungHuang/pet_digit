@@ -25,6 +25,8 @@ class FirebaseMessageEventSource implements MessageEventSource {
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subscription;
   String? _activeRoomId;
   bool _connected = false;
+  final FirebaseInitialSnapshotGate _initialSnapshotGate =
+      FirebaseInitialSnapshotGate();
 
   Future<void> setActiveRoom(String roomId) async {
     if (roomId.isEmpty) throw ArgumentError.value(roomId, 'roomId');
@@ -58,6 +60,7 @@ class FirebaseMessageEventSource implements MessageEventSource {
       throw StateError('Authentication required for Firebase message listener');
     }
     _stateController.add(MessageConnectionState.connecting);
+    _initialSnapshotGate.reset();
     final query = _firestore
         .collection('rooms')
         .doc(roomId)
@@ -67,11 +70,15 @@ class FirebaseMessageEventSource implements MessageEventSource {
     _subscription = query.snapshots().listen(
       (snapshot) {
         _stateController.add(MessageConnectionState.connected);
+        final addedOrigin = _initialSnapshotGate.originForSnapshot(
+          isFromCache: snapshot.metadata.isFromCache,
+        );
         for (final change in snapshot.docChanges) {
           _deltaController.add(
             FirebaseMessageMapper.fromDocumentChange(
               change,
               currentUid: _auth.currentUser?.uid,
+              addedOrigin: addedOrigin,
             ),
           );
         }
@@ -97,4 +104,18 @@ class FirebaseMessageEventSource implements MessageEventSource {
     await _deltaController.close();
     await _stateController.close();
   }
+}
+
+class FirebaseInitialSnapshotGate {
+  bool _awaitingServerSnapshot = true;
+
+  MessageAddedOrigin originForSnapshot({required bool isFromCache}) {
+    final origin = _awaitingServerSnapshot
+        ? MessageAddedOrigin.initialSnapshot
+        : MessageAddedOrigin.live;
+    if (!isFromCache) _awaitingServerSnapshot = false;
+    return origin;
+  }
+
+  void reset() => _awaitingServerSnapshot = true;
 }

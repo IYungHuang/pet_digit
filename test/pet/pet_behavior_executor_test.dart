@@ -48,7 +48,7 @@ void main() {
     expect(controller.bouncingToy?.emoji, '🧶');
   });
 
-  test('media user tap starts inspect runtime', () {
+  test('dog media user tap preserves legacy inspect fallback', () {
     final controller = PetWorldController();
     final target = _target(
       kind: WorldObjectKind.animatedToy,
@@ -65,6 +65,95 @@ void main() {
     expect(controller.currentAction, PetActionType.inspectGif);
     expect(controller.state, PetState.observe);
     expect(controller.activeTarget?.id, target.id);
+  });
+
+  test('cat paw test action starts dedicated native runtime', () {
+    final controller = PetWorldController()..selectedPet = PetType.cat;
+    final target = _target(
+      kind: WorldObjectKind.animatedToy,
+      contentKind: PetNormalizedContentKind.image,
+      payload: 'https://example.test/photo.png',
+    );
+
+    final result = PetBehaviorExecutor(controller).execute(
+      _selection(
+        PetBehaviorAction.pawTest,
+        PetBehaviorCapability.native,
+        stimulusType: PetStimulusType.newMessageBubble,
+      ),
+      target,
+    );
+
+    expect(result.status, PetBehaviorExecutionStatus.executed);
+    expect(controller.currentAction, PetActionType.pawTest);
+    expect(controller.state, PetState.catStalk);
+    expect(controller.activeTarget?.id, target.id);
+  });
+
+  test('new cat media starts low stalking paw probe', () {
+    final controller = PetWorldController()..selectedPet = PetType.cat;
+    final target = _target(
+      kind: WorldObjectKind.animatedToy,
+      contentKind: PetNormalizedContentKind.image,
+      payload: 'https://example.test/photo.png',
+    );
+
+    final result = PetBehaviorExecutor(controller).execute(
+      _selection(
+        PetBehaviorAction.pawTest,
+        PetBehaviorCapability.native,
+        stimulusType: PetStimulusType.newMessageBubble,
+      ),
+      target,
+    );
+
+    expect(result.status, PetBehaviorExecutionStatus.executed);
+    expect(controller.currentAction, PetActionType.pawTest);
+    expect(controller.state, PetState.catStalk);
+  });
+
+  test('new dog media starts sniff and nose probe runtime', () {
+    final controller = PetWorldController();
+    final target = _target(
+      kind: WorldObjectKind.animatedToy,
+      contentKind: PetNormalizedContentKind.gif,
+      payload: 'https://example.test/clip.gif',
+    );
+
+    final result = PetBehaviorExecutor(controller).execute(
+      _selection(
+        PetBehaviorAction.novelObjectNoseProbe,
+        PetBehaviorCapability.native,
+        stimulusType: PetStimulusType.newMessageBubble,
+      ),
+      target,
+    );
+
+    expect(result.status, PetBehaviorExecutionStatus.executed);
+    expect(controller.currentAction, PetActionType.dogProbe);
+    expect(controller.state, PetState.dogProbe);
+  });
+
+  test('new parrot media starts monocular beak probe runtime', () {
+    final controller = PetWorldController()..selectedPet = PetType.parrot;
+    final target = _target(
+      kind: WorldObjectKind.animatedToy,
+      contentKind: PetNormalizedContentKind.video,
+      payload: 'https://example.test/clip.mp4',
+    );
+
+    final result = PetBehaviorExecutor(controller).execute(
+      _selection(
+        PetBehaviorAction.beakProbe,
+        PetBehaviorCapability.native,
+        stimulusType: PetStimulusType.newMessageBubble,
+      ),
+      target,
+    );
+
+    expect(result.status, PetBehaviorExecutionStatus.executed);
+    expect(controller.currentAction, PetActionType.parrotProbe);
+    expect(controller.state, PetState.parrotProbe);
   });
 
   test('circle sniff degrades to walk-toward observe runtime', () {
@@ -215,9 +304,10 @@ PetBehaviorSelection _selection(
   PetBehaviorAction action,
   PetBehaviorCapability capability, {
   String targetId = 'target',
+  PetStimulusType stimulusType = PetStimulusType.userTap,
 }) => PetBehaviorSelection(
   action: action,
-  stimulusType: PetStimulusType.userTap,
+  stimulusType: stimulusType,
   targetId: targetId,
   capability: capability,
   reason: 'test:$action',

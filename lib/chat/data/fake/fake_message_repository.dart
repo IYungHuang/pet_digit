@@ -88,7 +88,12 @@ class FakeMessageRepository implements MessageRepository {
     MessageDraft draft, {
     void Function(double progress)? onUploadProgress,
   }) async {
-    _applyDelta(MessageDelta.added(ChatMessage.fromDraft(draft)));
+    _applyDelta(
+      MessageDelta.added(
+        ChatMessage.fromDraft(draft),
+        origin: MessageAddedOrigin.localOptimistic,
+      ),
+    );
 
     var effectiveDraft = draft;
     if (_requiresUpload(draft.content) && !upload.isAtomicUpload) {

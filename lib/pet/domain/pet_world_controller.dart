@@ -20,6 +20,9 @@ enum PetActionType {
   jumpToPlatform,
   chaseEmoji,
   inspectGif,
+  pawTest,
+  dogProbe,
+  parrotProbe,
   observeTarget,
 }
 
@@ -31,8 +34,10 @@ class PetWorldController implements PetBehaviorRuntime {
   set objects(List<PetMessageTarget> targets) => setMessageTargets(targets);
   bool _hasMessageSnapshot = false;
   String? _messageSnapshotRoomId;
+  final Set<({String roomId, String clientId})> _seenMessageSources = {};
   double _time = 0;
   double _walkDirection = 1;
+  Size _viewportSize = Size.zero;
 
   double get direction => _walkDirection;
 
@@ -129,6 +134,16 @@ class PetWorldController implements PetBehaviorRuntime {
   double _actionElapsed = 0.0;
   double _dustTimer = 0.0;
   double _stepBounceTimer = 0.0;
+  Offset _pawTestStart = Offset.zero;
+  Offset _pawTestTarget = Offset.zero;
+  bool _pawTestUsesRightSide = false;
+  bool _pawTestFirstImpact = false;
+  bool _pawTestSecondImpact = false;
+  Offset _probeStart = Offset.zero;
+  bool _probeUsesRightSide = false;
+  bool _probeFirstImpact = false;
+  bool _probeSecondImpact = false;
+  bool _inspectUsesRightSide = false;
   _PendingStimulus? _pendingStimulus;
 
   PetInteractable? get activeTarget => _activeTarget;
@@ -147,13 +162,50 @@ class PetWorldController implements PetBehaviorRuntime {
         return (_time / 0.2).floor().clamp(0, 1);
       case PetState.observe:
         return (_time / 0.35).floor() % 2;
+      case PetState.catStalk:
+        return (_time / 0.18).floor() % 4;
+      case PetState.pawTest:
+        return _pawTestFrameIndex;
+      case PetState.dogProbe:
+        return _dogProbeFrameIndex;
+      case PetState.parrotProbe:
+        return _parrotProbeFrameIndex;
     }
+  }
+
+  int get _pawTestFrameIndex {
+    final elapsedMs = (_actionElapsed * 1000).round();
+    if (elapsedMs < 1850) return 0;
+    if (elapsedMs < 2000) return 1;
+    if (elapsedMs < 2150) return 2;
+    if (elapsedMs < 2300) return 3;
+    if (elapsedMs < 2450) return 4;
+    return 5;
+  }
+
+  int get _dogProbeFrameIndex {
+    if (_actionElapsed < 0.2) return 0;
+    if (_actionElapsed < 0.65) return 1;
+    if (_actionElapsed < 1.0) return 2;
+    if (_actionElapsed < 1.7) return 3;
+    if (_actionElapsed < 2.3) return 4;
+    return 5;
+  }
+
+  int get _parrotProbeFrameIndex {
+    if (_actionElapsed < 0.2) return 0;
+    if (_actionElapsed < 0.45) return 1;
+    if (_actionElapsed < 0.7) return 2;
+    if (_actionElapsed < 1.7) return 3;
+    if (_actionElapsed < 2.3) return 4;
+    return 5;
   }
 
   void loadRoom(ChatRoom room) {
     _objects = const [];
     _hasMessageSnapshot = false;
     _messageSnapshotRoomId = room.id;
+    _seenMessageSources.clear();
     _pendingStimulus = null;
     state = PetState.idle;
     position = const Offset(24, 24);
@@ -179,10 +231,8 @@ class PetWorldController implements PetBehaviorRuntime {
     springNotifier.value++;
   }
 
-  /// Installs a room snapshot, then emits arrivals only for added identities.
-  /// The first snapshot after room entry is history, including an empty one.
-  /// Without event provenance, later history additions are indistinguishable
-  /// from live arrivals. Call [setMessageTargets] for explicit history installs.
+  /// Installs a room snapshot without inferring whether an item is live.
+  /// Live behavior dispatch is owned by [handleMessageAdded].
   List<PetBehaviorExecutionResult> setMessageBubbleTargets(
     Iterable<domain.ChatMessage> messages, {
     String? roomId,
@@ -194,45 +244,46 @@ class PetWorldController implements PetBehaviorRuntime {
         roomId ??
         (targets.isEmpty ? null : targets.first.sourceIdentity?.roomId) ??
         _messageSnapshotRoomId;
-    final isBaseline =
-        !_hasMessageSnapshot ||
-        (_messageSnapshotRoomId != null &&
-            snapshotRoomId != _messageSnapshotRoomId);
-    final previousSources = {
-      for (final target in objects)
-        if (target.sourceIdentity != null) target.sourceIdentity!,
-    };
-    final previousIds = {
-      for (final target in objects)
-        (roomId: target.sourceIdentity?.roomId, id: target.id),
-    };
-    final additions = isBaseline
-        ? const <PetMessageTarget>[]
-        : targets
-              .where(
-                (target) =>
-                    !previousSources.contains(target.sourceIdentity) &&
-                    !previousIds.contains((
-                      roomId: target.sourceIdentity?.roomId,
-                      id: target.id,
-                    )),
-              )
-              .toList();
-
     setMessageTargets(targets);
+    if (!_hasMessageSnapshot || snapshotRoomId != _messageSnapshotRoomId) {
+      _seenMessageSources
+        ..clear()
+        ..addAll(targets.map((target) => target.sourceIdentity).nonNulls);
+    }
     _hasMessageSnapshot = true;
     _messageSnapshotRoomId = snapshotRoomId;
-    // Installation and reconciliation must finish before any event dispatch.
-    return [
-      for (final target in additions)
-        dispatch(
-          PetBehaviorNormalizer.fromTarget(
-            target,
-            PetStimulusType.newMessageBubble,
-            petType: selectedPet,
-          ),
-        ),
-    ];
+    return const [];
+  }
+
+  PetBehaviorExecutionResult? handleMessageAdded(
+    domain.ChatMessage message, {
+    required bool isLive,
+  }) {
+    final target = PetMessageTargetFactory.fromDomainMessage(message);
+    final source = target.sourceIdentity;
+    if (source == null || source.roomId != _messageSnapshotRoomId) return null;
+    if (!_seenMessageSources.add(source) || !isLive) return null;
+
+    final existingIndex = objects.indexWhere(
+      (candidate) => candidate.sourceIdentity == source,
+    );
+    final nextTargets = objects.toList();
+    if (existingIndex < 0) {
+      nextTargets.add(target);
+    } else {
+      nextTargets[existingIndex] = target;
+    }
+    setMessageTargets(nextTargets);
+    final runtimeTarget = objects.firstWhere(
+      (candidate) => candidate.sourceIdentity == source,
+    );
+    return dispatch(
+      PetBehaviorNormalizer.fromTarget(
+        runtimeTarget,
+        PetStimulusType.newMessageBubble,
+        petType: selectedPet,
+      ),
+    );
   }
 
   /// Replaces message data while transferring runtime ownership by identity.
@@ -309,6 +360,10 @@ class PetWorldController implements PetBehaviorRuntime {
     }
     _syncTargetGeometry();
     _retryPendingStimulus();
+  }
+
+  void updateViewportSize(Size size) {
+    _viewportSize = size;
   }
 
   void _syncTargetGeometry() {
@@ -402,6 +457,15 @@ class PetWorldController implements PetBehaviorRuntime {
       case PetActionType.inspectGif:
         _tickInspectGif(dt);
         break;
+      case PetActionType.pawTest:
+        _tickPawTest(dt);
+        break;
+      case PetActionType.dogProbe:
+        _tickDogProbe(dt);
+        break;
+      case PetActionType.parrotProbe:
+        _tickParrotProbe(dt);
+        break;
       case PetActionType.observeTarget:
         _tickObserveTarget(dt);
         break;
@@ -461,6 +525,15 @@ class PetWorldController implements PetBehaviorRuntime {
         action: null,
         targetId: stimulus.targetId,
         reason: 'no selection for stimulus',
+      );
+    }
+    if (stimulus.stimulusType == PetStimulusType.newMessageBubble &&
+        currentAction != PetActionType.none) {
+      return PetBehaviorExecutionResult(
+        status: PetBehaviorExecutionStatus.ignored,
+        action: selection.action,
+        targetId: stimulus.targetId,
+        reason: 'active action is not interrupted by message arrival',
       );
     }
     final result = PetBehaviorExecutor(this).execute(selection, target);
@@ -655,6 +728,7 @@ class PetWorldController implements PetBehaviorRuntime {
   }
 
   void _startInspectGif(PetInteractable target) {
+    _inspectUsesRightSide = _usesRightSideOf(target.bounds);
     currentAction = PetActionType.inspectGif;
     state = PetState.observe;
   }
@@ -667,14 +741,15 @@ class PetWorldController implements PetBehaviorRuntime {
       return;
     }
 
-    final bounds = target.bounds;
-    final watchX = (bounds.left + 16).clamp(16.0, 280.0);
-    final targetUnder = Offset(watchX, bounds.bottom - 12);
+    final targetPosition = _messageSidePosition(
+      target,
+      useRightSide: _inspectUsesRightSide,
+    );
 
     if (_actionElapsed < 0.6) {
       // Phase 1: Alert & watch with ears perked
       state = PetState.observe;
-      _walkDirection = watchX >= position.dx ? 1.0 : -1.0;
+      _walkDirection = targetPosition.dx >= position.dx ? 1.0 : -1.0;
     } else if (_actionElapsed < 1.2) {
       // Phase 2: Excited tail wagging & floating hearts (Video 1)
       state = PetState.observe;
@@ -685,8 +760,8 @@ class PetWorldController implements PetBehaviorRuntime {
     } else if (_actionElapsed < 1.9) {
       // Phase 3: Approach towards bottom of GIF bubble
       state = PetState.run;
-      final dx = targetUnder.dx - position.dx;
-      final dy = targetUnder.dy - position.dy;
+      final dx = targetPosition.dx - position.dx;
+      final dy = targetPosition.dy - position.dy;
       final dist = math.sqrt(dx * dx + dy * dy);
       if (dist > 6) {
         _walkDirection = dx >= 0 ? 1.0 : -1.0;
@@ -700,7 +775,7 @@ class PetWorldController implements PetBehaviorRuntime {
     } else if (_actionElapsed < 2.8) {
       // Phase 4: Leap up with front paws resting on the bottom border of the GIF (Video 1 00:09)
       state = PetState.pounce;
-      position = targetUnder;
+      position = targetPosition;
       if (_dustTimer > 0.2) {
         _dustTimer = 0.0;
         _spawnHeart(position.translate(20, -10));
@@ -711,6 +786,233 @@ class PetWorldController implements PetBehaviorRuntime {
       state = PetState.idle;
       _time = 0.0;
     }
+  }
+
+  @override
+  void startPawTest(PetInteractable target) {
+    final liveTarget = _beginRuntimeAction(target, null, platformImpulse: 60.0);
+    _pawTestStart = position;
+    _pawTestUsesRightSide = _usesRightSideOf(liveTarget.bounds);
+    _pawTestTarget = _messageSidePosition(
+      liveTarget,
+      useRightSide: _pawTestUsesRightSide,
+    );
+    _walkDirection = _pawTestTarget.dx >= position.dx ? 1.0 : -1.0;
+    _pawTestFirstImpact = false;
+    _pawTestSecondImpact = false;
+    currentAction = PetActionType.pawTest;
+    state = PetState.catStalk;
+  }
+
+  void _tickPawTest(double dt) {
+    final target = _activeTarget;
+    if (target == null) {
+      currentAction = PetActionType.none;
+      state = PetState.idle;
+      return;
+    }
+
+    _pawTestTarget = _messageSidePosition(
+      target,
+      useRightSide: _pawTestUsesRightSide,
+    );
+    final elapsedMs = (_actionElapsed * 1000).round();
+    final previousElapsedMs = ((_actionElapsed - dt) * 1000).round();
+    if (!_pawTestFirstImpact && previousElapsedMs < 2000 && elapsedMs >= 2000) {
+      _pawTestFirstImpact = true;
+      triggerBubbleImpulse(target.id, 45.0);
+    }
+    if (!_pawTestSecondImpact &&
+        previousElapsedMs < 2450 &&
+        elapsedMs >= 2450) {
+      _pawTestSecondImpact = true;
+      triggerBubbleImpulse(target.id, 32.0);
+    }
+    final firstStop = Offset.lerp(_pawTestStart, _pawTestTarget, 0.35)!;
+    if (_actionElapsed < 0.55) {
+      position = _pawTestStart;
+      state = PetState.catStalk;
+      return;
+    }
+    if (_actionElapsed < 1.0) {
+      final progress = _easeInOut((_actionElapsed - 0.55) / 0.45);
+      final movementDx = _pawTestTarget.dx - position.dx;
+      if (movementDx.abs() > 0.001) {
+        _walkDirection = movementDx.isNegative ? -1.0 : 1.0;
+      }
+      position = Offset.lerp(_pawTestStart, firstStop, progress)!;
+      state = PetState.catStalk;
+      _handleFootsteps(dt, isRunning: false);
+      return;
+    }
+    if (_actionElapsed < 1.3) {
+      position = firstStop;
+      state = PetState.catStalk;
+      return;
+    }
+    if (_actionElapsed < 1.7) {
+      final progress = _easeInOut((_actionElapsed - 1.3) / 0.4);
+      position = Offset.lerp(firstStop, _pawTestTarget, progress)!;
+      state = PetState.catStalk;
+      _handleFootsteps(dt, isRunning: false);
+      return;
+    }
+
+    position = _pawTestTarget;
+    _walkDirection = _pawTestUsesRightSide ? -1.0 : 1.0;
+    if (_actionElapsed < 3.0) {
+      state = PetState.pawTest;
+      return;
+    }
+
+    currentAction = PetActionType.none;
+    state = PetState.idle;
+    _time = 0.0;
+  }
+
+  bool _usesRightSideOf(Rect bounds) {
+    const petWidth = 64.0;
+    const bubbleGap = 8.0;
+    const requiredClearance = petWidth + bubbleGap;
+    if (_viewportSize.width <= 0) return bounds.left < requiredClearance;
+
+    final leftFits = bounds.left >= requiredClearance;
+    final rightFits = bounds.right + requiredClearance <= _viewportSize.width;
+    if (leftFits != rightFits) return rightFits;
+    if (leftFits) return false;
+    return _viewportSize.width - bounds.right > bounds.left;
+  }
+
+  Offset _messageSidePosition(
+    PetInteractable target, {
+    required bool useRightSide,
+  }) {
+    const petWidth = 64.0;
+    const petHeight = 64.0;
+    const feetOffset = 52.0;
+    const bubbleGap = 8.0;
+    final bounds = target.bounds;
+    final x = useRightSide
+        ? bounds.right + bubbleGap
+        : bounds.left - petWidth - bubbleGap;
+    final maxX = _viewportSize.width > 0
+        ? math.max(0.0, _viewportSize.width - petWidth)
+        : double.infinity;
+    final y = bounds.bottom - feetOffset + getBubbleDeflection(target.id);
+    final maxY = _viewportSize.height > 0
+        ? math.max(0.0, _viewportSize.height - petHeight)
+        : double.infinity;
+    return Offset(x.clamp(0.0, maxX), y.clamp(0.0, maxY));
+  }
+
+  @override
+  void startDogProbe(PetInteractable target) {
+    final liveTarget = _beginRuntimeAction(target, null, platformImpulse: 60.0);
+    _startSpeciesProbe(liveTarget);
+    currentAction = PetActionType.dogProbe;
+    state = PetState.dogProbe;
+  }
+
+  void _tickDogProbe(double dt) {
+    final target = _activeTarget;
+    if (target == null) {
+      currentAction = PetActionType.none;
+      state = PetState.idle;
+      return;
+    }
+    final targetPosition = _messageSidePosition(
+      target,
+      useRightSide: _probeUsesRightSide,
+    );
+    final elapsedMs = (_actionElapsed * 1000).round();
+    final previousElapsedMs = ((_actionElapsed - dt) * 1000).round();
+    if (!_probeFirstImpact && previousElapsedMs < 1700 && elapsedMs >= 1700) {
+      _probeFirstImpact = true;
+      triggerBubbleImpulse(target.id, 24.0);
+    }
+    if (!_probeSecondImpact && previousElapsedMs < 2300 && elapsedMs >= 2300) {
+      _probeSecondImpact = true;
+      triggerBubbleImpulse(target.id, 18.0);
+    }
+    if (_actionElapsed < 0.2) {
+      position = _probeStart;
+    } else if (_actionElapsed < 1.0) {
+      final progress = _easeInOut((_actionElapsed - 0.2) / 0.8);
+      final base = Offset.lerp(_probeStart, targetPosition, progress)!;
+      position = base.translate(0, -math.sin(math.pi * progress) * 18);
+      _walkDirection = targetPosition.dx >= _probeStart.dx ? 1.0 : -1.0;
+    } else {
+      position = targetPosition;
+      _walkDirection = _probeUsesRightSide ? -1.0 : 1.0;
+    }
+    state = PetState.dogProbe;
+    if (_actionElapsed >= 2.8) {
+      currentAction = PetActionType.none;
+      state = PetState.idle;
+    }
+  }
+
+  @override
+  void startParrotProbe(PetInteractable target) {
+    final liveTarget = _beginRuntimeAction(target, null, platformImpulse: 60.0);
+    _startSpeciesProbe(liveTarget);
+    currentAction = PetActionType.parrotProbe;
+    state = PetState.parrotProbe;
+  }
+
+  void _tickParrotProbe(double dt) {
+    final target = _activeTarget;
+    if (target == null) {
+      currentAction = PetActionType.none;
+      state = PetState.idle;
+      return;
+    }
+    final targetPosition = _messageSidePosition(
+      target,
+      useRightSide: _probeUsesRightSide,
+    );
+    final elapsedMs = (_actionElapsed * 1000).round();
+    final previousElapsedMs = ((_actionElapsed - dt) * 1000).round();
+    if (!_probeFirstImpact && previousElapsedMs < 1700 && elapsedMs >= 1700) {
+      _probeFirstImpact = true;
+      triggerBubbleImpulse(target.id, 20.0);
+    }
+    if (!_probeSecondImpact && previousElapsedMs < 2300 && elapsedMs >= 2300) {
+      _probeSecondImpact = true;
+      triggerBubbleImpulse(target.id, 14.0);
+    }
+    if (_actionElapsed < 0.2) {
+      position = _probeStart;
+    } else if (_actionElapsed < 0.7) {
+      final progress = _easeInOut((_actionElapsed - 0.2) / 0.5);
+      position = Offset.lerp(_probeStart, targetPosition, progress)!;
+      _walkDirection = targetPosition.dx >= _probeStart.dx ? 1.0 : -1.0;
+    } else {
+      position = targetPosition;
+      _walkDirection = _probeUsesRightSide ? -1.0 : 1.0;
+    }
+    state = PetState.parrotProbe;
+    if (_actionElapsed >= 2.7) {
+      currentAction = PetActionType.none;
+      state = PetState.idle;
+    }
+  }
+
+  void _startSpeciesProbe(PetInteractable target) {
+    _probeStart = position;
+    _probeUsesRightSide = _usesRightSideOf(target.bounds);
+    _probeFirstImpact = false;
+    _probeSecondImpact = false;
+    final targetPosition = _messageSidePosition(
+      target,
+      useRightSide: _probeUsesRightSide,
+    );
+    _walkDirection = targetPosition.dx >= position.dx ? 1.0 : -1.0;
+  }
+
+  double _easeInOut(double value) {
+    final t = value.clamp(0.0, 1.0);
+    return t * t * (3 - 2 * t);
   }
 
   @override
@@ -730,12 +1032,17 @@ class PetWorldController implements PetBehaviorRuntime {
     }
     if (!_walkTowardObservationTarget) {
       state = PetState.observe;
+      if (_actionElapsed >= 0.9) {
+        currentAction = PetActionType.none;
+        state = PetState.idle;
+        _activeTarget = null;
+      }
       return;
     }
 
-    final targetPosition = Offset(
-      target.bounds.center.dx - 32,
-      target.bounds.bottom - 52,
+    final targetPosition = _messageSidePosition(
+      target,
+      useRightSide: _usesRightSideOf(target.bounds),
     );
     final dx = targetPosition.dx - position.dx;
     final dy = targetPosition.dy - position.dy;
@@ -743,15 +1050,24 @@ class PetWorldController implements PetBehaviorRuntime {
     if (distance <= 12) {
       _walkTowardObservationTarget = false;
       state = PetState.observe;
+      _actionElapsed = 0;
       return;
     }
 
     state = PetState.walk;
     _walkDirection = dx >= 0 ? 1.0 : -1.0;
     const speed = 90.0;
+    final step = speed * dt;
+    if (step >= distance) {
+      position = targetPosition;
+      _walkTowardObservationTarget = false;
+      state = PetState.observe;
+      _actionElapsed = 0;
+      return;
+    }
     position = Offset(
-      position.dx + (dx / distance) * speed * dt,
-      position.dy + (dy / distance) * speed * dt,
+      position.dx + (dx / distance) * step,
+      position.dy + (dy / distance) * step,
     );
     _handleFootsteps(dt, isRunning: false);
   }
