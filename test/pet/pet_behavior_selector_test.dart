@@ -4,6 +4,7 @@ import 'package:chat_pet_mvp/pet/domain/pet_behavior_catalog.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_behavior_normalizer.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_behavior_runtime.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_behavior_selector.dart';
+import 'package:chat_pet_mvp/pet/domain/pet_behavior_trigger_matcher.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_message_content_kind.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_message_target.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_world.dart';
@@ -189,22 +190,17 @@ void main() {
     expect(newMessage?.action, PetBehaviorAction.approachArc);
   });
 
-  test('rejects a new-message trigger misfiled in the user-tap source', () {
-    const selectorWithMisfiledTrigger = PetBehaviorSelector(
-      triggerOverrides: {
-        PetStimulusType.userTap: [
-          PetBehaviorTrigger(
-            stimulus: PetStimulusType.newMessageBubble,
-            action: PetBehaviorAction.nosePawBump,
-            petType: PetType.corgi,
-            priority: 20,
-          ),
-        ],
-      },
+  test('trigger matcher rejects a mismatched declared stimulus', () {
+    const trigger = PetBehaviorTrigger(
+      stimulus: PetStimulusType.newMessageBubble,
+      action: PetBehaviorAction.nosePawBump,
+      petType: PetType.corgi,
     );
 
-    final selection = selectorWithMisfiledTrigger.select(
-      _stimulus(
+    final matches = PetBehaviorTriggerMatcher.matches(
+      trigger: trigger,
+      profileActions: const [PetBehaviorAction.nosePawBump],
+      stimulus: _stimulus(
         PetType.corgi,
         PetStimulusType.userTap,
         WorldObjectKind.platform,
@@ -212,7 +208,7 @@ void main() {
       ),
     );
 
-    expect(selection, isNull);
+    expect(matches, isFalse);
   });
 
   test('wrong target kind returns no candidate', () {

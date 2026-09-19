@@ -1,23 +1,21 @@
 import 'pet_behavior_catalog.dart';
 import 'pet_behavior_runtime.dart';
+import 'pet_behavior_trigger_matcher.dart';
 
 /// Pure, deterministic catalog selector for normalized pet stimuli.
 class PetBehaviorSelector {
-  const PetBehaviorSelector({this.triggerOverrides = const {}});
-
-  final Map<PetStimulusType, List<PetBehaviorTrigger>> triggerOverrides;
+  const PetBehaviorSelector();
 
   PetBehaviorSelection? select(PetBehaviorStimulus stimulus) {
     final profile = PetBehaviorCatalog.profiles[stimulus.petType];
     if (profile == null) return null;
 
-    final defaultTriggers = switch (stimulus.stimulusType) {
+    final triggers = switch (stimulus.stimulusType) {
       PetStimulusType.userTap => PetBehaviorCatalog.legacyTapTriggers,
       PetStimulusType.newMessageBubble =>
         PetBehaviorCatalog.novelObjectTriggers,
       _ => const <PetBehaviorTrigger>[],
     };
-    final triggers = triggerOverrides[stimulus.stimulusType] ?? defaultTriggers;
     final profileActions =
         stimulus.stimulusType == PetStimulusType.newMessageBubble
         ? profile.novelObjectActions
@@ -28,7 +26,7 @@ class PetBehaviorSelector {
 
     PetBehaviorTrigger? selected;
     for (final trigger in triggers) {
-      if (!_isCompatible(
+      if (!PetBehaviorTriggerMatcher.matches(
         trigger: trigger,
         profileActions: profileActions,
         stimulus: stimulus,
@@ -48,23 +46,5 @@ class PetBehaviorSelector {
       capability: definition.capability,
       reason: '${stimulus.stimulusType.name}:${selected.action.name}',
     );
-  }
-
-  bool _isCompatible({
-    required PetBehaviorTrigger trigger,
-    required List<PetBehaviorAction> profileActions,
-    required PetBehaviorStimulus stimulus,
-  }) {
-    if (trigger.stimulus != stimulus.stimulusType) return false;
-    if (trigger.petType != null && trigger.petType != stimulus.petType) {
-      return false;
-    }
-    if (!profileActions.contains(trigger.action)) return false;
-
-    final definition = PetBehaviorCatalog.actionDefinitions[trigger.action];
-    if (definition == null) return false;
-    return definition.supportedStimulusTypes.contains(stimulus.stimulusType) &&
-        definition.supportedContentKinds.contains(stimulus.contentKind) &&
-        definition.supportedTargetKinds.contains(stimulus.targetKind);
   }
 }
