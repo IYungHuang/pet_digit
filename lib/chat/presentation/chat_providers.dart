@@ -2,29 +2,62 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import '../application/media_picker_service.dart';
-import '../application/message_delta.dart';
-import '../application/message_store.dart';
 import '../data/fake/fake_media_upload_data_source.dart';
 import '../data/fake/fake_message_event_source.dart';
 import '../data/fake/fake_message_remote_data_source.dart';
 import '../data/fake/fake_message_repository.dart';
 import '../data/message_data_sources.dart';
-import '../data/remote/dio_message_data_sources.dart';
-import '../data/remote/web_socket_message_event_source.dart';
+import '../data/firebase/firebase_media_upload_data_source.dart';
+import '../data/firebase/firebase_message_event_source.dart';
+import '../data/firebase/firebase_message_remote_data_source.dart';
+import '../data/firebase/firebase_message_repository.dart';
 import '../domain/chat_message.dart';
 import '../domain/message_content.dart';
 import '../domain/message_draft.dart';
 import '../domain/message_repository.dart';
 import '../domain/message_status.dart';
 import '../domain/message_connection_state.dart';
+import '../../firebase/firebase_environment.dart';
 
 typedef SendMessage =
     Future<ChatMessage> Function(
       MessageDraft draft, {
       void Function(double progress)? onUploadProgress,
     });
+
+final firebaseEnvironmentProvider = Provider<FirebaseEnvironment>(
+  (ref) => FirebaseEnvironment.fromDartDefine(),
+);
+
+final firebaseAuthProvider = Provider<FirebaseAuth?>((ref) {
+  final mode = ref.watch(firebaseEnvironmentProvider).mode;
+  return mode == FirebaseEnvironmentMode.fake ? null : FirebaseAuth.instance;
+});
+
+final firebaseFirestoreProvider = Provider<FirebaseFirestore?>((ref) {
+  final mode = ref.watch(firebaseEnvironmentProvider).mode;
+  return mode == FirebaseEnvironmentMode.fake
+      ? null
+      : FirebaseFirestore.instance;
+});
+
+final firebaseStorageProvider = Provider<FirebaseStorage?>((ref) {
+  final mode = ref.watch(firebaseEnvironmentProvider).mode;
+  return mode == FirebaseEnvironmentMode.fake ? null : FirebaseStorage.instance;
+});
+
+final firebaseFunctionsProvider = Provider<FirebaseFunctions?>((ref) {
+  final mode = ref.watch(firebaseEnvironmentProvider).mode;
+  return mode == FirebaseEnvironmentMode.fake
+      ? null
+      : FirebaseFunctions.instanceFor(region: 'us-central1');
+});
 
 final chatEventSourceProvider = Provider<MessageEventSource>((ref) {
   if (ref.watch(useBackendTransportProvider)) {
@@ -33,36 +66,64 @@ final chatEventSourceProvider = Provider<MessageEventSource>((ref) {
   return FakeMessageEventSource();
 });
 
-final useBackendTransportProvider = Provider<bool>((ref) => false);
+final useBackendTransportProvider = Provider<bool>((ref) {
+  return ref.watch(firebaseEnvironmentProvider).mode ==
+      FirebaseEnvironmentMode.emulator;
+});
 
 final backendEventSourceProvider = Provider<MessageEventSource>((ref) {
-  return WebSocketMessageEventSource(
-    uri: ref.watch(backendWebSocketUriProvider),
-  );
+  final firestore = ref.watch(firebaseFirestoreProvider);
+  final auth = ref.watch(firebaseAuthProvider);
+  if (firestore == null || auth == null) {
+    throw StateError(
+      'Firebase emulator providers require initialized Firebase',
+    );
+  }
+  return FirebaseMessageEventSource(firestore: firestore, auth: auth);
 });
 
 final backendRemoteDataSourceProvider = Provider<MessageRemoteDataSource>((
   ref,
 ) {
-  return DioMessageRemoteDataSource(dio: ref.watch(backendDioProvider));
+  final functions = ref.watch(firebaseFunctionsProvider);
+  final auth = ref.watch(firebaseAuthProvider);
+  if (functions == null || auth == null) {
+    throw StateError(
+      'Firebase emulator providers require initialized Firebase',
+    );
+  }
+  return FirebaseMessageRemoteDataSource(functions: functions, auth: auth);
 });
 
-final backendUploadDataSourceProvider = Provider<MediaUploadDataSource>(
-  (ref) => DioMediaUploadDataSource(),
-);
+final backendUploadDataSourceProvider = Provider<MediaUploadDataSource>((ref) {
+  final storage = ref.watch(firebaseStorageProvider);
+  final auth = ref.watch(firebaseAuthProvider);
+  if (storage == null || auth == null) {
+    throw StateError(
+      'Firebase emulator providers require initialized Firebase',
+    );
+  }
+  return FirebaseMediaUploadDataSource(storage: storage, auth: auth);
+});
 
 final chatRepositoryProvider = Provider<MessageRepository>((ref) {
   final useBackend = ref.watch(useBackendTransportProvider);
-  final repository = FakeMessageRepository(
-    remote: useBackend
-        ? ref.watch(backendRemoteDataSourceProvider)
-        : FakeMessageRemoteDataSource(),
-    upload: useBackend
-        ? ref.watch(backendUploadDataSourceProvider)
-        : FakeMediaUploadDataSource(),
-    events: ref.watch(chatEventSourceProvider),
-  );
-  if (!useBackend) repository.seedMessages(_seedMessages);
+  late final MessageRepository repository;
+  if (useBackend) {
+    repository = FirebaseMessageRepository(
+      remote: ref.watch(backendRemoteDataSourceProvider),
+      upload: ref.watch(backendUploadDataSourceProvider),
+      events: ref.watch(chatEventSourceProvider) as FirebaseMessageEventSource,
+    );
+  } else {
+    final fakeRepository = FakeMessageRepository(
+      remote: FakeMessageRemoteDataSource(),
+      upload: FakeMediaUploadDataSource(),
+      events: ref.watch(chatEventSourceProvider),
+    );
+    fakeRepository.seedMessages(_seedMessages);
+    repository = fakeRepository;
+  }
   ref.onDispose(() => unawaited(repository.dispose()));
   return repository;
 });
@@ -94,19 +155,14 @@ final chatConnectionProvider = FutureProvider.autoDispose<void>((ref) async {
 final roomMessagesProvider = StreamProvider.autoDispose
     .family<List<ChatMessage>, String>((ref, roomId) async* {
       final repository = ref.watch(chatRepositoryProvider);
+      final source = ref.watch(chatEventSourceProvider);
+      if (source is FirebaseMessageEventSource) {
+        await source.setActiveRoom(roomId);
+      }
       await repository.connect();
-      final store = MessageStore();
-      store.mergeInitial(await repository.loadMessages(roomId));
-      yield store.messagesForRoom(roomId);
-      await for (final delta in repository.watchDeltas()) {
-        final deltaRoomId = switch (delta) {
-          MessageAdded(:final message) => message.roomId,
-          MessageModified(:final message) => message.roomId,
-          MessageRemoved(:final roomId) => roomId,
-        };
-        if (deltaRoomId != roomId) continue;
-        store.apply(delta);
-        yield store.messagesForRoom(roomId);
+      yield await repository.loadMessages(roomId);
+      await for (final messages in repository.watchRoomMessages(roomId)) {
+        yield messages;
       }
     });
 

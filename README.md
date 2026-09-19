@@ -11,6 +11,49 @@ flutter pub get
 flutter run -d macos
 ```
 
+Firebase transport stays fake by default. Firebase packages are included, but
+no production Firebase options or project credentials are committed.
+
+### Firebase Emulator mode
+
+Start backend emulators first:
+
+```bash
+cd /Users/appgongyong/Documents/Codex/2026-09-18/pet_digit_backend
+npm run emulator
+```
+
+Ports come from backend `firebase.json`: Auth `9099`, Firestore `8080`,
+Storage `9199`, Functions `5001`, Emulator UI `4000`. Run app with:
+
+```bash
+flutter run -d macos --dart-define=CHAT_TRANSPORT=emulator
+```
+
+Environment modes: `fake` (default), `emulator`, and
+`production-placeholder`. Production-placeholder intentionally throws because
+this repository has no production project or credentials.
+
+Fake/unit tests:
+
+```bash
+flutter analyze
+flutter test
+git diff --check
+```
+
+Native emulator integration test requires a signed macOS development target
+with Firebase Keychain access. Standard driver command:
+
+```bash
+FIREBASE_EMULATOR_TEST=1 flutter drive \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/firebase_emulator_test.dart \
+  -d macos
+```
+
+It uses only local emulator hosts and a local-only FirebaseOptions placeholder.
+
 For mobile, list devices with `flutter devices`, then run `flutter run -d <device-id>`.
 
 ## MVP interactions
