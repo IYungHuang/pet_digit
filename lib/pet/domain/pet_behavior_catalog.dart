@@ -1,4 +1,6 @@
 import 'pet_world.dart';
+import 'pet_behavior_runtime.dart';
+import 'pet_message_content_kind.dart';
 
 /// Stable phase used to group pet behaviors.
 ///
@@ -20,6 +22,7 @@ enum PetBehaviorCategory {
 
 /// External event that can cause a behavior sequence to start.
 enum PetStimulusType {
+  userTap,
   newMessageBubble,
   emoji,
   gif,
@@ -97,11 +100,19 @@ class PetActionDefinition {
     required this.action,
     required this.category,
     required this.animationKey,
+    this.supportedStimulusTypes = const <PetStimulusType>[],
+    this.supportedContentKinds = const <PetNormalizedContentKind>[],
+    this.supportedTargetKinds = const <WorldObjectKind>[],
+    this.capability = PetBehaviorCapability.unsupported,
   });
 
   final PetBehaviorAction action;
   final PetBehaviorCategory category;
   final String animationKey;
+  final List<PetStimulusType> supportedStimulusTypes;
+  final List<PetNormalizedContentKind> supportedContentKinds;
+  final List<WorldObjectKind> supportedTargetKinds;
+  final PetBehaviorCapability capability;
 }
 
 class PetBehaviorTrigger {
