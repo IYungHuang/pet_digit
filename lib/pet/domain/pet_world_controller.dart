@@ -29,6 +29,8 @@ class PetWorldController implements PetBehaviorRuntime {
   List<PetMessageTarget> _objects = const [];
   List<PetMessageTarget> get objects => _objects;
   set objects(List<PetMessageTarget> targets) => setMessageTargets(targets);
+  bool _hasMessageSnapshot = false;
+  String? _messageSnapshotRoomId;
   double _time = 0;
   double _walkDirection = 1;
 
@@ -150,6 +152,8 @@ class PetWorldController implements PetBehaviorRuntime {
 
   void loadRoom(ChatRoom room) {
     _objects = const [];
+    _hasMessageSnapshot = false;
+    _messageSnapshotRoomId = room.id;
     _pendingStimulus = null;
     state = PetState.idle;
     position = const Offset(24, 24);
@@ -175,8 +179,60 @@ class PetWorldController implements PetBehaviorRuntime {
     springNotifier.value++;
   }
 
-  void setMessageBubbleTargets(Iterable<domain.ChatMessage> messages) {
-    setMessageTargets(messages.map(PetMessageTargetFactory.fromDomainMessage));
+  /// Installs a room snapshot, then emits arrivals only for added identities.
+  /// The first snapshot after room entry is history, including an empty one.
+  /// Without event provenance, later history additions are indistinguishable
+  /// from live arrivals. Call [setMessageTargets] for explicit history installs.
+  List<PetBehaviorExecutionResult> setMessageBubbleTargets(
+    Iterable<domain.ChatMessage> messages, {
+    String? roomId,
+  }) {
+    final targets = messages
+        .map(PetMessageTargetFactory.fromDomainMessage)
+        .toList();
+    final snapshotRoomId =
+        roomId ??
+        (targets.isEmpty ? null : targets.first.sourceIdentity?.roomId) ??
+        _messageSnapshotRoomId;
+    final isBaseline =
+        !_hasMessageSnapshot ||
+        (_messageSnapshotRoomId != null &&
+            snapshotRoomId != _messageSnapshotRoomId);
+    final previousSources = {
+      for (final target in objects)
+        if (target.sourceIdentity != null) target.sourceIdentity!,
+    };
+    final previousIds = {
+      for (final target in objects)
+        (roomId: target.sourceIdentity?.roomId, id: target.id),
+    };
+    final additions = isBaseline
+        ? const <PetMessageTarget>[]
+        : targets
+              .where(
+                (target) =>
+                    !previousSources.contains(target.sourceIdentity) &&
+                    !previousIds.contains((
+                      roomId: target.sourceIdentity?.roomId,
+                      id: target.id,
+                    )),
+              )
+              .toList();
+
+    setMessageTargets(targets);
+    _hasMessageSnapshot = true;
+    _messageSnapshotRoomId = snapshotRoomId;
+    // Installation and reconciliation must finish before any event dispatch.
+    return [
+      for (final target in additions)
+        dispatch(
+          PetBehaviorNormalizer.fromTarget(
+            target,
+            PetStimulusType.newMessageBubble,
+            petType: selectedPet,
+          ),
+        ),
+    ];
   }
 
   /// Replaces message data while transferring runtime ownership by identity.

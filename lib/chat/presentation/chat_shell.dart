@@ -294,7 +294,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
     final connectionState = ref.watch(messageConnectionStateProvider);
     final messages = messageState.asData?.value;
     if (messages != null) {
-      _world.setMessageBubbleTargets(messages);
+      _world.setMessageBubbleTargets(messages, roomId: _activeRoomId);
     }
     final messageCount = messageState.asData?.value.length;
     if (messageCount != null) {

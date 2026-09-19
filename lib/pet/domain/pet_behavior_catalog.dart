@@ -141,7 +141,7 @@ class PetBehaviorProfile {
   final List<PetBehaviorAction> novelObjectActions;
 }
 
-/// Data-only catalog for future behavior selection and animation playback.
+/// Data-only catalog consumed by the runtime selector and executor.
 ///
 /// This catalog is intentionally separate from [PetActionType]. The latter is
 /// the current runtime flow; this catalog describes the full behavior space.
@@ -559,6 +559,9 @@ class PetBehaviorCatalog {
     ),
   };
 
+  // Approach candidates currently remain unsupported: selecting one must not
+  // imply animation support or substitute a user-tap runtime sequence.
+  // Equal-priority candidates retain catalog order (corgi chooses approachArc).
   static const novelObjectTriggers = <PetBehaviorTrigger>[
     PetBehaviorTrigger(
       stimulus: PetStimulusType.newMessageBubble,

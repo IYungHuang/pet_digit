@@ -1,5 +1,59 @@
 # Chat Pet MVP Handoff Report
 
+## Runtime integration update — 2026-09-19
+
+This section is the current pet runtime handoff. The original 2026-09-18 report below is retained as historical context; its test count, fixed-coordinate limitations, and proposed implementation phases are not the current runtime status.
+
+### Runtime boundary
+
+`PetMessageTargetFactory` adapts both Freezed chat messages and legacy demo messages into one `PetMessageTarget` collection. Text becomes a platform, emoji-only text becomes an emoji toy, and image/GIF/video becomes an animated target. Normalized content and payload travel with the target; the executor never guesses payload from a concrete message class.
+
+`PetBehaviorNormalizer` creates an explicit `PetBehaviorStimulus`. The pure `PetBehaviorSelector` filters species profiles and trigger metadata by stimulus, content, and target kind, using catalog order to break priority ties. `PetBehaviorExecutor` then invokes existing controller transitions. `PetActionType` still owns jump, chase, inspect, and observe sequences; catalog names and animation keys do not create new visual animations.
+
+Catalog capability (`native`, `degraded`, `unsupported`) and execution outcome (`executed`, `fallback`, `ignored`) are separate contracts:
+
+| Input / species | Catalog action | Capability | Current runtime outcome |
+| --- | --- | --- | --- |
+| Text tap / corgi | `nosePawBump` | native for platform + userTap | `executed`: platform jump |
+| Text tap / cat, parrot | `headBuntRub`, `beakTouch` | degraded | `fallback`: platform jump |
+| Emoji tap / corgi, cat | `runChase`, `pounce` | native | `executed`: payload-aware emoji chase |
+| Emoji tap / parrot | `flyFlap` | degraded | `fallback`: emoji chase; no flight animation |
+| Media tap / corgi, cat, parrot | `sniffBubble`, `sniffWhiskerScan`, `headTiltEyeFocus` | degraded | `fallback`: existing inspect/observe sequence |
+| New text / corgi, cat, parrot | `approachArc`, `approachLowSilent`, `approachSideways` | unsupported | `ignored`: no equivalent motion, active tap runtime preserved |
+| New emoji or media / any species | No matching new-message candidate | — | `ignored`: no selection; never treated as a tap |
+
+`approachStopStart` is also unsupported and follows `approachArc` at equal priority. `flyBack` is ignored, never substituted with walking. Executor adapters for `hidePeek`, `beakProbe`, and `beakManipulate` can explicitly fall back to observation when invoked directly; these actions have no eligible message triggers and no native animation. Other unenabled catalog actions remain outside automatic message selection. This integration does not claim complete animation coverage for the catalog.
+
+### Identity, geometry, and bounded retry
+
+- Canonical domain target ID is `serverId ?? clientId`; legacy targets use their stable message ID. Each message dispatches independently, even when content is identical.
+- Stable domain source identity is `(roomId, clientId)`. Source identity preserves ownership across acknowledgement; canonical identity keys layout bounds and bubble springs. Reconciliation transfers the active target, landed platform, measured bounds, spring, and pending stimulus to the live canonical target.
+- Dispatch rejects stale species, source identity, content kind, target kind, or payload. Room changes cannot reuse a stale message event from another room.
+- Geometry is measured from message widgets. An initial zero rectangle is not ready geometry. Layout updates also refresh airborne landing coordinates and landed platform position.
+- An unmeasured selected target returns `ignored`. With no running action, only one pending stimulus is retained; the latest eligible event replaces that slot. There is no event queue. While an action runs, an unready arrival does not queue or interrupt it.
+- `updateObjectBounds()` retries the pending stimulus at most once after its target is measured, revalidating species, source, target data, and selection. It clears the slot before execution, including unsupported results. Removal, source/content changes, room changes, or species changes invalidate pending work.
+
+### New-message integration and provenance limitation
+
+`interact(id)` emits only `userTap`; normalized explicit `newMessageBubble` events enter through `dispatch(stimulus)` after target installation. The current `roomMessagesProvider` supplies snapshots without live/history provenance, so `setMessageBubbleTargets(messages, roomId: activeRoomId)` provides a narrow snapshot adapter for ChatShell:
+
+1. `loadRoom()` resets arrival tracking. The first domain snapshot is a baseline and emits no events, including an empty baseline.
+2. Later snapshots compare room-scoped canonical IDs and stable source identities with installed targets. Rebuilds, edits, reorderings, and client-to-server acknowledgement do not count as arrivals.
+3. The adapter installs and reconciles all targets before dispatching each addition as `newMessageBubble`, returning one execution result per addition. Room changes establish a new baseline. No species logic is added to ChatShell.
+4. `setMessageTargets()` remains a silent installation path for callers that already know a snapshot is history. Explicit event producers can use it followed by normalized `dispatch()` calls.
+
+Limitation: additions after the baseline can be delayed history, reconnect backfill, or messages removed and later reintroduced. Snapshot data cannot distinguish these from live messages. An empty first snapshot followed by delayed history has the same limitation. Initial nonempty room history is never replayed, and no history-wide trigger or chat sync rewrite was introduced. A future provenance-bearing message event should replace this inference.
+
+### Verification and scope
+
+Task 6 integration tests cover species-specific arrival selection, preservation of running taps for all three species, independent canonical/source targets, baseline and room reset, acknowledgement/reordering, and a single consumed bounds retry. Existing controller and ChatShell tap tests remain part of verification. See `.superpowers/sdd/2026-09-19-pet-behavior-runtime/task-6-report.md` for RED/GREEN and final command results.
+
+No packages, animation assets, or backend changes are included. New native approach animations remain future work.
+
+---
+
+## Original MVP report (historical)
+
 日期：2026-09-18
 
 專案路徑：
