@@ -22,6 +22,7 @@ class PetMessageTarget implements PetMessageTargetData, PetBoundedInteractable {
     required this.contentKind,
     required this.payload,
     required this.messageText,
+    this.sourceIdentity,
   });
 
   @override
@@ -34,6 +35,10 @@ class PetMessageTarget implements PetMessageTargetData, PetBoundedInteractable {
   final Object? payload;
   @override
   final String messageText;
+
+  /// Stable domain identity across client-ID to server-ID acknowledgement.
+  /// Legacy and standalone targets reconcile by canonical [id].
+  final ({String roomId, String clientId})? sourceIdentity;
 
   Rect? _measuredBounds;
 

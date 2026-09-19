@@ -35,7 +35,11 @@ class PetMessageTargetFactory {
       ),
     };
 
-    return _targetFor(id: domainMessageId(message), normalized: normalized);
+    return _targetFor(
+      id: domainMessageId(message),
+      sourceIdentity: (roomId: message.roomId, clientId: message.clientId),
+      normalized: normalized,
+    );
   }
 
   static PetMessageTarget fromLegacyMessage(legacy.ChatMessage message) {
@@ -63,8 +67,10 @@ class PetMessageTargetFactory {
   static PetMessageTarget _targetFor({
     required String id,
     required _NormalizedMessage normalized,
+    ({String roomId, String clientId})? sourceIdentity,
   }) => PetMessageTarget(
     id: id,
+    sourceIdentity: sourceIdentity,
     kind: switch (normalized.contentKind) {
       PetNormalizedContentKind.text => WorldObjectKind.platform,
       PetNormalizedContentKind.emoji => WorldObjectKind.emojiToy,

@@ -10,7 +10,6 @@ import 'pet_behavior_executor.dart';
 import 'pet_behavior_normalizer.dart';
 import 'pet_behavior_runtime.dart';
 import 'pet_behavior_selector.dart';
-import 'pet_message_bubble.dart';
 import 'pet_message_target.dart';
 import 'pet_message_target_factory.dart';
 import 'pet_effects.dart';
@@ -27,17 +26,22 @@ enum PetActionType {
 class PetWorldController implements PetBehaviorRuntime {
   PetState state = PetState.idle;
   Offset position = const Offset(24, 24);
-  List<PetInteractable> objects = const [];
+  List<PetMessageTarget> _objects = const [];
+  List<PetMessageTarget> get objects => _objects;
+  set objects(List<PetMessageTarget> targets) => setMessageTargets(targets);
   double _time = 0;
   double _walkDirection = 1;
 
   double get direction => _walkDirection;
 
-  PetType selectedPet = PetType.corgi;
+  PetType _selectedPet = PetType.corgi;
+  PetType get selectedPet => _selectedPet;
+  set selectedPet(PetType newPet) => setPet(newPet);
   PetConfig get petConfig => PetConfig.of(selectedPet);
 
   void setPet(PetType newPet) {
-    selectedPet = newPet;
+    if (newPet != selectedPet) _resetActiveAction();
+    _selectedPet = newPet;
     pawPrints.clear();
     particles.clear();
     final center = Offset(position.dx + 32, position.dy + 16);
@@ -123,6 +127,7 @@ class PetWorldController implements PetBehaviorRuntime {
   double _actionElapsed = 0.0;
   double _dustTimer = 0.0;
   double _stepBounceTimer = 0.0;
+  _PendingStimulus? _pendingStimulus;
 
   PetInteractable? get activeTarget => _activeTarget;
   Object? get activePayload => _activePayload;
@@ -144,13 +149,8 @@ class PetWorldController implements PetBehaviorRuntime {
   }
 
   void loadRoom(ChatRoom room) {
-    objects = [
-      for (var i = 0; i < room.messages.length; i++)
-        MessageWorldObject(
-          message: room.messages[i],
-          position: messageWorldPosition(i),
-        ),
-    ];
+    _objects = const [];
+    _pendingStimulus = null;
     state = PetState.idle;
     position = const Offset(24, 24);
     _time = 0;
@@ -169,36 +169,99 @@ class PetWorldController implements PetBehaviorRuntime {
     particles.clear();
     pawPrints.clear();
     _bubbleSprings.clear();
+    setMessageTargets(
+      room.messages.map(PetMessageTargetFactory.fromLegacyMessage),
+    );
     springNotifier.value++;
   }
 
   void setMessageBubbleTargets(Iterable<domain.ChatMessage> messages) {
-    final nextTargets = [
-      for (final message in messages) PetMessageBubbleTarget(message: message),
-    ];
-    final currentIds = objects.map((object) => object.id).toList();
-    final nextIds = nextTargets.map((target) => target.id).toList();
-    if (_sameIds(currentIds, nextIds)) return;
+    setMessageTargets(messages.map(PetMessageTargetFactory.fromDomainMessage));
+  }
 
-    objects = nextTargets;
-    if (_activeTarget != null && !nextIds.contains(_activeTarget!.id)) {
-      _activeTarget = null;
-      currentPlatform = null;
-      currentAction = PetActionType.none;
-      state = PetState.idle;
+  /// Replaces message data while transferring runtime ownership by identity.
+  void setMessageTargets(Iterable<PetMessageTarget> targets) {
+    final nextTargets = List<PetMessageTarget>.unmodifiable(targets);
+    final byId = {for (final target in objects) target.id: target};
+    final bySource = {
+      for (final target in objects)
+        if (target.sourceIdentity != null) target.sourceIdentity!: target,
+    };
+    final replacements = <PetMessageTarget, PetMessageTarget>{};
+    final nextSprings = <String, BubbleSpring>{};
+    for (final next in nextTargets) {
+      final previous = bySource[next.sourceIdentity] ?? byId[next.id];
+      if (previous == null ||
+          previous.sourceIdentity?.roomId != next.sourceIdentity?.roomId) {
+        continue;
+      }
+      replacements[previous] = next;
+      if (!next.hasMeasuredBounds && previous.hasMeasuredBounds) {
+        next.markMeasuredBounds(previous.bounds);
+      }
+      final spring = _bubbleSprings[previous.id];
+      if (spring != null) nextSprings[next.id] = spring;
     }
+
+    final active = _activeTarget;
+    final nextActive = replacements[active];
+    final platform = currentPlatform;
+    final nextPlatform = replacements[platform];
+    final pending = _pendingStimulus;
+    _objects = nextTargets;
+    if ((active != null &&
+            (nextActive == null || nextActive.kind != active.kind)) ||
+        (platform != null && nextPlatform == null)) {
+      _resetActiveAction();
+    } else {
+      _activeTarget = nextActive;
+      currentPlatform = nextPlatform;
+      if (pending != null) {
+        final nextPending = replacements[pending.target];
+        _pendingStimulus = nextPending != null && pending.matches(nextPending)
+            ? _PendingStimulus(nextPending, pending.stimulus, pending.action)
+            : null;
+      }
+    }
+    final springsChanged = !mapEquals(_bubbleSprings, nextSprings);
+    _bubbleSprings
+      ..clear()
+      ..addAll(nextSprings);
+    _syncTargetGeometry();
+    // Notify only after references, readiness and canonical spring keys agree.
+    if (springsChanged) springNotifier.value++;
+  }
+
+  void _resetActiveAction() {
+    _activeTarget = null;
+    _activePayload = null;
+    currentPlatform = null;
+    currentAction = PetActionType.none;
+    state = PetState.idle;
+    bouncingToy = null;
+    _walkTowardObservationTarget = false;
+    _pendingStimulus = null;
+    _actionElapsed = 0;
+    _time = 0;
   }
 
   void updateObjectBounds(Map<String, Rect> boundsMap) {
     for (final obj in objects) {
-      if (obj is PetBoundedInteractable && boundsMap.containsKey(obj.id)) {
-        obj.updateBounds(boundsMap[obj.id]!);
+      if (boundsMap.containsKey(obj.id)) {
+        obj.markMeasuredBounds(boundsMap[obj.id]!);
       }
     }
+    _syncTargetGeometry();
+    _retryPendingStimulus();
+  }
 
-    // If currently standing on a platform, snap Y to top surface + springDeflection
-    if (currentPlatform != null && boundsMap.containsKey(currentPlatform!.id)) {
-      final bounds = boundsMap[currentPlatform!.id]!;
+  void _syncTargetGeometry() {
+    if (currentAction == PetActionType.jumpToPlatform &&
+        _activeTarget != null) {
+      _jumpTarget = _platformLandingPosition(_activeTarget!.bounds);
+    }
+    if (currentPlatform != null) {
+      final bounds = currentPlatform!.bounds;
       final maxBoundX = math.max(bounds.left + 4, bounds.right - 56).toDouble();
       final springDeflection = getBubbleDeflection(currentPlatform!.id);
       position = Offset(
@@ -206,6 +269,30 @@ class PetWorldController implements PetBehaviorRuntime {
         bounds.top - 52 + springDeflection,
       );
     }
+  }
+
+  void _retryPendingStimulus() {
+    final pending = _pendingStimulus;
+    if (pending == null) return;
+    if (currentAction != PetActionType.none ||
+        pending.stimulus.petType != selectedPet ||
+        !objects.contains(pending.target) ||
+        !pending.matches(pending.target)) {
+      _pendingStimulus = null;
+      return;
+    }
+    if (!pending.target.hasMeasuredBounds) return;
+    final stimulus = PetBehaviorNormalizer.fromTarget(
+      pending.target,
+      pending.stimulus.stimulusType,
+      petType: selectedPet,
+    );
+    _pendingStimulus = null;
+    if (const PetBehaviorSelector().select(stimulus)?.action !=
+        pending.action) {
+      return;
+    }
+    dispatch(stimulus);
   }
 
   void tick(Duration elapsed) {
@@ -270,8 +357,7 @@ class PetWorldController implements PetBehaviorRuntime {
 
   /// Compatibility entry point for existing tap callers.
   PetBehaviorExecutionResult interact(String objectId) {
-    final object = _objectForId(objectId);
-    final target = object == null ? null : _normalizedTargetForObject(object);
+    final target = _objectForId(objectId);
     if (target == null) {
       return PetBehaviorExecutionResult(
         status: PetBehaviorExecutionStatus.ignored,
@@ -291,13 +377,24 @@ class PetWorldController implements PetBehaviorRuntime {
 
   /// Resolves a catalog behavior and delegates only approved runtime work.
   PetBehaviorExecutionResult dispatch(PetBehaviorStimulus stimulus) {
-    final target = _targetForStimulus(stimulus);
+    final target = _objectForId(stimulus.targetId);
     if (target == null) {
       return PetBehaviorExecutionResult(
         status: PetBehaviorExecutionStatus.ignored,
         action: null,
         targetId: stimulus.targetId,
         reason: 'target is unavailable',
+      );
+    }
+    if (stimulus.petType != selectedPet ||
+        stimulus.targetKind != target.kind ||
+        stimulus.contentKind != target.contentKind ||
+        stimulus.payload != target.payload) {
+      return PetBehaviorExecutionResult(
+        status: PetBehaviorExecutionStatus.ignored,
+        action: null,
+        targetId: stimulus.targetId,
+        reason: 'stimulus no longer matches selected pet or target',
       );
     }
     final selection = const PetBehaviorSelector().select(stimulus);
@@ -309,59 +406,16 @@ class PetWorldController implements PetBehaviorRuntime {
         reason: 'no selection for stimulus',
       );
     }
-    return PetBehaviorExecutor(this).execute(selection, target);
+    final result = PetBehaviorExecutor(this).execute(selection, target);
+    if (!target.hasMeasuredBounds && currentAction == PetActionType.none) {
+      _pendingStimulus = _PendingStimulus(target, stimulus, selection.action);
+    }
+    return result;
   }
 
-  PetInteractable? _objectForId(String objectId) => objects
-      .cast<PetInteractable?>()
+  PetMessageTarget? _objectForId(String objectId) => objects
+      .cast<PetMessageTarget?>()
       .firstWhere((item) => item?.id == objectId, orElse: () => null);
-
-  PetMessageTarget? _normalizedTargetForObject(PetInteractable object) {
-    if (object is PetMessageTarget) return object;
-    if (object is PetMessageBubbleTarget) {
-      return _copyTarget(object.data, object);
-    }
-    if (object is MessageWorldObject) {
-      // Legacy room targets remain supported until Task 5 collection migration.
-      final target = PetMessageTargetFactory.fromLegacyMessage(object.message);
-      target.markMeasuredBounds(object.bounds);
-      return target;
-    }
-    return null;
-  }
-
-  PetMessageTarget? _targetForStimulus(PetBehaviorStimulus stimulus) {
-    final object = _objectForId(stimulus.targetId);
-    if (object == null) return null;
-    final target = PetMessageTarget(
-      id: stimulus.targetId,
-      kind: stimulus.targetKind,
-      contentKind: stimulus.contentKind,
-      payload: stimulus.payload,
-      messageText: '${stimulus.payload}',
-    );
-    if (object is PetBoundedInteractable && object.hasMeasuredBounds) {
-      target.markMeasuredBounds(object.bounds);
-    }
-    return target;
-  }
-
-  PetMessageTarget _copyTarget(
-    PetMessageTargetData data,
-    PetInteractable object,
-  ) {
-    final target = PetMessageTarget(
-      id: data.id,
-      kind: data.kind,
-      contentKind: data.contentKind,
-      payload: data.payload,
-      messageText: data.messageText,
-    );
-    if (object is PetBoundedInteractable && object.hasMeasuredBounds) {
-      target.markMeasuredBounds(object.bounds);
-    }
-    return target;
-  }
 
   PetInteractable _beginRuntimeAction(
     PetInteractable target,
@@ -369,6 +423,7 @@ class PetWorldController implements PetBehaviorRuntime {
     required double platformImpulse,
   }) {
     _cancelActiveRuntimeArtifacts(platformImpulse: platformImpulse);
+    _pendingStimulus = null;
     final liveTarget = _objectForId(target.id) ?? target;
     _activeTarget = liveTarget;
     _activePayload = payload;
@@ -399,21 +454,24 @@ class PetWorldController implements PetBehaviorRuntime {
 
   void _startJumpToPlatform(PetBoundedInteractable target) {
     currentAction = PetActionType.jumpToPlatform;
-    final bounds = target.bounds;
-    final maxBoundX = math.max(bounds.left + 4, bounds.right - 56).toDouble();
-    final targetX = (bounds.center.dx - 32).clamp(bounds.left + 4, maxBoundX);
-    final targetY = bounds.top - 52;
-
-    _walkDirection = targetX >= position.dx ? 1.0 : -1.0;
+    _jumpTarget = _platformLandingPosition(target.bounds);
+    _walkDirection = _jumpTarget.dx >= position.dx ? 1.0 : -1.0;
     _jumpStart = position;
-    _jumpTarget = Offset(targetX, targetY);
     _jumpDuration = 0.55;
     _jumpTime = 0.0;
     _jumpArcHeight = math.max(
       35.0,
-      (_jumpStart.dy - targetY).abs() * 0.4 + 25.0,
+      (_jumpStart.dy - _jumpTarget.dy).abs() * 0.4 + 25.0,
     );
     state = PetState.jump;
+  }
+
+  Offset _platformLandingPosition(Rect bounds) {
+    final maxX = math.max(bounds.left + 4, bounds.right - 56).toDouble();
+    return Offset(
+      (bounds.center.dx - 32).clamp(bounds.left + 4, maxX),
+      bounds.top - 52,
+    );
   }
 
   void _tickJumpToPlatform(double dt) {
@@ -450,14 +508,6 @@ class PetWorldController implements PetBehaviorRuntime {
       _spawnDust(position.translate(16, 52));
       _spawnDust(position.translate(40, 52));
     }
-  }
-
-  bool _sameIds(List<String> left, List<String> right) {
-    if (left.length != right.length) return false;
-    for (var index = 0; index < left.length; index++) {
-      if (left[index] != right[index]) return false;
-    }
-    return true;
   }
 
   // --- Emoji Chase (Video 2: Emoji Bouncing & Corgi Chasing) ---
@@ -771,4 +821,17 @@ class PetWorldController implements PetBehaviorRuntime {
       ),
     );
   }
+}
+
+class _PendingStimulus {
+  const _PendingStimulus(this.target, this.stimulus, this.action);
+
+  final PetMessageTarget target;
+  final PetBehaviorStimulus stimulus;
+  final PetBehaviorAction action;
+
+  bool matches(PetMessageTarget candidate) =>
+      candidate.kind == stimulus.targetKind &&
+      candidate.contentKind == stimulus.contentKind &&
+      candidate.payload == stimulus.payload;
 }

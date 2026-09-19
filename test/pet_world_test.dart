@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:chat_pet_mvp/chat/data/fake_chat_repository.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_effects.dart';
@@ -10,6 +12,7 @@ void main() {
     final room = FakeChatRepository.rooms.first;
 
     controller.loadRoom(room);
+    _measureTargets(controller);
 
     expect(controller.objects, isNotEmpty);
     expect(
@@ -31,6 +34,7 @@ void main() {
   test('loading another room resets pet location and state', () {
     final controller = PetWorldController();
     controller.loadRoom(FakeChatRepository.rooms.first);
+    _measureTargets(controller);
     controller.interact(controller.objects.first.id);
     controller.loadRoom(FakeChatRepository.rooms.last);
 
@@ -72,6 +76,7 @@ void main() {
   test('interacts with text platform bubble via jump arc and stands on top', () {
     final controller = PetWorldController();
     controller.loadRoom(FakeChatRepository.rooms.first);
+    _measureTargets(controller);
 
     final textPlatform = controller.objects
         .firstWhere((object) => object.kind == WorldObjectKind.platform);
@@ -90,6 +95,7 @@ void main() {
   test('tapping emoji launches bouncing toy and corgi chases with dust trails', () {
     final controller = PetWorldController();
     controller.loadRoom(FakeChatRepository.rooms.first);
+    _measureTargets(controller);
 
     final emojiToy = controller.objects
         .firstWhere((object) => object.kind == WorldObjectKind.emojiToy);
@@ -108,6 +114,7 @@ void main() {
   test('inspecting GIF progresses through observation, hearts, and leap', () {
     final controller = PetWorldController();
     controller.loadRoom(FakeChatRepository.rooms.first);
+    _measureTargets(controller);
 
     final gifToy = controller.objects
         .firstWhere((object) => object.kind == WorldObjectKind.animatedToy);
@@ -128,6 +135,7 @@ void main() {
   test('landing on bubble triggers spring oscillation and dog bounces synchronously', () {
     final controller = PetWorldController();
     controller.loadRoom(FakeChatRepository.rooms.first);
+    _measureTargets(controller);
 
     final platform = controller.objects
         .firstWhere((object) => object.kind == WorldObjectKind.platform);
@@ -181,6 +189,7 @@ void main() {
   test('projects surface shadow accurately across ground, airborne jump, and bouncing platform', () {
     final controller = PetWorldController();
     controller.loadRoom(FakeChatRepository.rooms.first);
+    _measureTargets(controller);
 
     // 1. On ground
     expect(controller.heightAboveSurface, 0.0);
@@ -237,3 +246,9 @@ void main() {
   });
 }
 
+void _measureTargets(PetWorldController controller) {
+  controller.updateObjectBounds({
+    for (final target in controller.objects)
+      target.id: const Rect.fromLTWH(100, 200, 180, 52),
+  });
+}
