@@ -10,7 +10,10 @@ class FakeMessageRemoteDataSource implements MessageRemoteDataSource {
   int _nextServerId = 1;
 
   @override
-  Future<RemoteMessageReceipt> send(MessageDraft draft) async {
+  Future<RemoteMessageReceipt> send(
+    MessageDraft draft, {
+    void Function(double progress)? onProgress,
+  }) async {
     sendCount++;
     if (latency > Duration.zero) await Future<void>.delayed(latency);
     if (failNextSend) {

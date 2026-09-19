@@ -103,6 +103,24 @@ void main() {
       expect(unsupportedExt.isValid, isFalse);
       expect(unsupportedExt.errorMessage, contains('僅支援 JPG, PNG, GIF, WebP'));
     });
+
+    test('rejects media larger than default 50 MiB limit', () {
+      final result = MediaPolicy.validate(
+        path: '/tmp/large.mp4',
+        sizeBytes: MediaPolicy.maxMediaSizeBytes + 1,
+      );
+
+      expect(result.isValid, isFalse);
+      expect(result.errorMessage, contains('50MB'));
+    });
+
+    test('accepts media at exact size limit', () {
+      final result = MediaPolicy.validate(
+        path: '/tmp/exact.png',
+        sizeBytes: MediaPolicy.maxMediaSizeBytes,
+      );
+
+      expect(result.isValid, isTrue);
+    });
   });
 }
-

@@ -1,5 +1,7 @@
 # Phase 5: Chat Media Picker, Preview & Validation Implementation Plan
 
+Status: complete; size enforcement continued in Phase 6; real playback completed in Phase 7.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Implement native media picking via `image_picker`, comprehensive media format validation (`jpg`, `png`, `gif`, `webp`, `mp4`, `mov`), local and remote image preview rendering, and an interactive video player boundary modal, while preserving Riverpod architecture and pet overlay bubble interactions.
@@ -67,7 +69,7 @@
 
 **Behavior:**
 - Full-screen or dialog `ImagePreviewDialog`: displays local/remote image, filename, zoom/dismiss affordance.
-- `VideoPlayerBoundaryDialog`: displays video title, format/MIME, local/remote path, duration, boundary explanation ("影片播放器邊界，播放引擎延後整合"), and simulated play/pause control.
+- `VideoPlayerBoundaryDialog`: displays video title, format/MIME, local/remote path, duration, and real `video_player` controls for playable local/HTTP sources; fake or unavailable sources use explicit fallback.
 - Ensure dialog presentation does not break pet world controller state.
 
 - [x] **Step 1: Write widget tests for image preview and video player boundary dialogs**
@@ -127,4 +129,3 @@
 - [x] **Step 1: Run full test suite and confirm all tests pass**
 - [x] **Step 2: Run flutter analyze and confirm clean output**
 - [x] **Step 3: Update docs/handoff/chat-room-ui-handoff.md with Phase 5 completion**
-

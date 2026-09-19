@@ -8,6 +8,9 @@ class FakeMediaUploadDataSource implements MediaUploadDataSource {
   final Duration latency;
 
   @override
+  bool get isAtomicUpload => false;
+
+  @override
   Future<MessageContent> upload(
     MessageDraft draft, {
     void Function(double progress)? onProgress,

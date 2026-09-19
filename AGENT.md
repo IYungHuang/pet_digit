@@ -14,10 +14,16 @@ Read [docs/handoff/chat-room-ui-handoff.md](docs/handoff/chat-room-ui-handoff.md
 when continuing chat room UI, provider, fake-adapter, or pet-bubble work from
 the current Phase 4 baseline.
 
+Before commit, follow [Git Commit Gate](docs/git-commit-gate.md): peer review
+first, then run the automated gate. Repository hook lives at `.githooks`.
+
 Current direction:
 
 - Build and validate UI flow with replaceable fake adapters first.
 - Keep domain models independent from backend DTOs and wire-level message type numbers.
 - Use Riverpod for dependency injection, lifecycle, room state, send state, and upload progress.
 - Use Freezed for immutable domain models, DTOs, state, and content unions.
-- Delay Drift, Retrofit, full video playback, offline persistence, and resumable uploads.
+- Keep backend composition replaceable; current default remains fake-first until
+  authenticated Dio/WebSocket providers are supplied.
+- Video playback uses `video_player`; connection state supports reconnect and
+  offline UI. Delay Drift, offline persistence, and resumable uploads.

@@ -11,6 +11,7 @@ import '../../chat/domain/media_policy.dart';
 import '../../chat/domain/message_content.dart';
 import '../../chat/domain/message_draft.dart';
 import '../../chat/domain/message_status.dart';
+import '../../chat/domain/message_connection_state.dart';
 import '../../pet/domain/pet_world.dart';
 import '../../pet/domain/pet_world_controller.dart';
 import '../../pet/presentation/pet_world_overlay.dart';
@@ -198,6 +199,9 @@ class _ChatShellState extends ConsumerState<ChatShell> {
   @override
   Widget build(BuildContext context) {
     final messageState = ref.watch(roomMessagesProvider(_activeRoomId));
+    final connectionState = ref.watch(
+      messageConnectionStateProvider(_activeRoomId),
+    );
     final messages = messageState.asData?.value;
     if (messages != null) {
       _world.setMessageBubbleTargets(messages);
@@ -266,6 +270,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
             activeRoomId: _activeRoomId,
             onSelected: _selectRoom,
           ),
+          _ConnectionBanner(state: connectionState),
           Expanded(
             child: Stack(
               key: _stackKey,
@@ -291,16 +296,16 @@ class _ChatShellState extends ConsumerState<ChatShell> {
                         onTap: () => _interact(message),
                         onOpenImagePreview:
                             message.content is ImageMessageContent
-                                ? () => _openImagePreview(
-                                    message.content as ImageMessageContent,
-                                  )
-                                : null,
+                            ? () => _openImagePreview(
+                                message.content as ImageMessageContent,
+                              )
+                            : null,
                         onOpenVideoPlayer:
                             message.content is VideoMessageContent
-                                ? () => _openVideoPlayer(
-                                    message.content as VideoMessageContent,
-                                  )
-                                : null,
+                            ? () => _openVideoPlayer(
+                                message.content as VideoMessageContent,
+                              )
+                            : null,
                         onRetry: message.status == MessageDeliveryStatus.failed
                             ? () => _retry(message)
                             : null,
@@ -325,7 +330,50 @@ class _ChatShellState extends ConsumerState<ChatShell> {
         ),
       ),
     );
+  }
+}
 
+class _ConnectionBanner extends StatelessWidget {
+  const _ConnectionBanner({required this.state});
+
+  final AsyncValue<MessageConnectionState> state;
+
+  @override
+  Widget build(BuildContext context) {
+    final connection = state.valueOrNull;
+    if (connection == null ||
+        connection == MessageConnectionState.connected ||
+        connection == MessageConnectionState.disconnected) {
+      return const SizedBox.shrink();
+    }
+    final (label, color, icon) = switch (connection) {
+      MessageConnectionState.connecting => ('連線中…', Colors.orange, Icons.sync),
+      MessageConnectionState.reconnecting => (
+        '重新連線中…',
+        Colors.orange,
+        Icons.sync_problem,
+      ),
+      MessageConnectionState.offline => ('目前離線', Colors.grey, Icons.cloud_off),
+      MessageConnectionState.error => ('連線失敗', Colors.red, Icons.error_outline),
+      MessageConnectionState.disconnected => (
+        '尚未連線',
+        Colors.grey,
+        Icons.cloud_off,
+      ),
+      MessageConnectionState.connected => ('', Colors.transparent, Icons.cloud),
+    };
+    return Container(
+      width: double.infinity,
+      color: color.withValues(alpha: 0.12),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(color: color, fontSize: 12)),
+        ],
+      ),
+    );
   }
 }
 
@@ -562,19 +610,23 @@ class _ImageMessageCard extends StatelessWidget {
     }
 
     Widget fallbackBox(String message) => Container(
-          width: 240,
-          height: 140,
-          color: Colors.black12,
-          alignment: Alignment.center,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.broken_image_outlined, size: 36, color: textColor.withValues(alpha: 0.6)),
-              const SizedBox(height: 4),
-              Text(message, style: TextStyle(color: textColor, fontSize: 12)),
-            ],
+      width: 240,
+      height: 140,
+      color: Colors.black12,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.broken_image_outlined,
+            size: 36,
+            color: textColor.withValues(alpha: 0.6),
           ),
-        );
+          const SizedBox(height: 4),
+          Text(message, style: TextStyle(color: textColor, fontSize: 12)),
+        ],
+      ),
+    );
 
     Widget imageWidget;
     if (hasLocal) {
@@ -583,8 +635,7 @@ class _ImageMessageCard extends StatelessWidget {
         width: 240,
         height: 140,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) =>
-            fallbackBox('無法載入本機圖片'),
+        errorBuilder: (context, error, stackTrace) => fallbackBox('無法載入本機圖片'),
       );
     } else if (isNetwork) {
       imageWidget = Image.network(
@@ -592,8 +643,7 @@ class _ImageMessageCard extends StatelessWidget {
         width: 240,
         height: 140,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) =>
-            fallbackBox('無法載入網路圖片'),
+        errorBuilder: (context, error, stackTrace) => fallbackBox('無法載入網路圖片'),
       );
     } else {
       imageWidget = Image.asset(
@@ -601,8 +651,7 @@ class _ImageMessageCard extends StatelessWidget {
         width: 240,
         height: 140,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) =>
-            fallbackBox('無法載入資源圖片'),
+        errorBuilder: (context, error, stackTrace) => fallbackBox('無法載入資源圖片'),
       );
     }
 
@@ -691,9 +740,6 @@ class _ImageMessageCard extends StatelessWidget {
       ],
     );
   }
-
-
-
 }
 
 class _VideoMessageCard extends StatelessWidget {
@@ -957,8 +1003,9 @@ class _MessageComposer extends ConsumerWidget {
                 ),
                 title: const Text('從相簿選擇圖片'),
                 subtitle: const Text('選取本機或電腦圖片 (JPG, PNG, GIF, WebP)'),
-                onTap: () =>
-                    Navigator.of(context).pop(_AttachmentChoice.pickGalleryImage),
+                onTap: () => Navigator.of(
+                  context,
+                ).pop(_AttachmentChoice.pickGalleryImage),
               ),
               ListTile(
                 leading: const Icon(
@@ -967,8 +1014,9 @@ class _MessageComposer extends ConsumerWidget {
                 ),
                 title: const Text('拍攝照片'),
                 subtitle: const Text('開啟相機拍攝（行動裝置支援）'),
-                onTap: () =>
-                    Navigator.of(context).pop(_AttachmentChoice.pickCameraImage),
+                onTap: () => Navigator.of(
+                  context,
+                ).pop(_AttachmentChoice.pickCameraImage),
               ),
               ListTile(
                 leading: const Icon(
@@ -977,8 +1025,9 @@ class _MessageComposer extends ConsumerWidget {
                 ),
                 title: const Text('從相簿選擇影片'),
                 subtitle: const Text('選取本機或電腦影片 (MP4, MOV，最大 50MB)'),
-                onTap: () =>
-                    Navigator.of(context).pop(_AttachmentChoice.pickGalleryVideo),
+                onTap: () => Navigator.of(
+                  context,
+                ).pop(_AttachmentChoice.pickGalleryVideo),
               ),
               ListTile(
                 leading: const Icon(
@@ -987,8 +1036,9 @@ class _MessageComposer extends ConsumerWidget {
                 ),
                 title: const Text('錄製影片'),
                 subtitle: const Text('開啟攝影機錄製（行動裝置支援）'),
-                onTap: () =>
-                    Navigator.of(context).pop(_AttachmentChoice.pickCameraVideo),
+                onTap: () => Navigator.of(
+                  context,
+                ).pop(_AttachmentChoice.pickCameraVideo),
               ),
               const Divider(),
               ListTile(
@@ -1015,20 +1065,20 @@ class _MessageComposer extends ConsumerWidget {
     try {
       switch (choice) {
         case _AttachmentChoice.pickGalleryImage:
-          final file =
-              await picker.pickImage(source: MediaPickerSource.gallery);
+          final file = await picker.pickImage(
+            source: MediaPickerSource.gallery,
+          );
           if (file != null) onPickedMedia(file);
         case _AttachmentChoice.pickCameraImage:
-          final file =
-              await picker.pickImage(source: MediaPickerSource.camera);
+          final file = await picker.pickImage(source: MediaPickerSource.camera);
           if (file != null) onPickedMedia(file);
         case _AttachmentChoice.pickGalleryVideo:
-          final file =
-              await picker.pickVideo(source: MediaPickerSource.gallery);
+          final file = await picker.pickVideo(
+            source: MediaPickerSource.gallery,
+          );
           if (file != null) onPickedMedia(file);
         case _AttachmentChoice.pickCameraVideo:
-          final file =
-              await picker.pickVideo(source: MediaPickerSource.camera);
+          final file = await picker.pickVideo(source: MediaPickerSource.camera);
           if (file != null) onPickedMedia(file);
         case _AttachmentChoice.fakeImage:
           onAttachment(_DemoAttachment.image);
@@ -1083,7 +1133,6 @@ class _MessageComposer extends ConsumerWidget {
     ),
   );
 }
-
 
 enum _DemoAttachmentKind { image, video }
 

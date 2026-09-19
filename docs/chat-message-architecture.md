@@ -362,7 +362,7 @@ build_runner
 ```text
 drift                 persistence/offline requirement not yet in scope
 retrofit              API contract still being validated
-full video player     UI can start with a video placeholder
+full video player     handled by Phase 7 UI boundary; backend streaming policy remains open
 resumable upload      not required for fake-first milestone
 ```
 
@@ -388,6 +388,9 @@ provider, and composer provider.
 Render text, image, and video placeholder states. Show pending, uploading,
 progress, sent, failed, and retry states.
 
+Video preview uses `video_player` for playable local files and HTTP/HTTPS URLs;
+domain message contracts remain transport-independent.
+
 ### Phase 5 — Lifecycle and dedupe
 
 Verify room switching, event cleanup, reconnect state, client ID merge, server ID
@@ -398,13 +401,17 @@ dedupe, and stable message ordering.
 Replace fake data sources with API, multipart upload, and WebSocket adapters.
 Keep domain and application layers unchanged.
 
+Current code provides these adapters under `lib/chat/data/remote/`, but default
+Riverpod wiring remains fake-first until authenticated Dio and WebSocket
+instances are supplied by app composition.
+
 ## 13. Non-goals for first milestone
 
 - Drift database
 - offline-first recovery
 - resumable uploads
 - Retrofit generation
-- full video playback
+- backend video streaming policy
 - threads
 - reactions
 - pagination

@@ -1,7 +1,7 @@
 # Chat Room UI Handoff
 
 Date: 2026-09-19
-Status: Phase 5 Media Picker, Preview & Validation complete
+Status: Phase 9 transport adapters and connection UI complete; fake provider remains active
 
 ## Current result
 
@@ -14,9 +14,13 @@ Supported UI flows:
 - Native image and video attachment flow via `image_picker` (Photo Gallery, Camera, Video Gallery, Camera Video).
 - Preset demo image/video attachments for automated tests and desktop simulators.
 - Strict media format validation via `MediaPolicy` (accepts `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `video/mp4`, `video/quicktime`; rejects unsupported formats with SnackBar feedback without clearing composer text).
+- 50MB file-size limit enforced before draft creation.
 - Real local image preview (`Image.file`) and remote/asset image preview in message cards.
 - Interactive `ImagePreviewDialog` with zoom & pan (`InteractiveViewer`).
-- Video message cards with duration badge, play action, and interactive `VideoPlayerBoundaryDialog` (providing playback boundary specifications, simulated controls, and metadata inspection).
+- Video message cards with duration badge, play action, and `VideoPlayerBoundaryDialog` backed by `video_player` for local files and HTTP/HTTPS URLs; unavailable fake sources show an explicit fallback.
+- Replaceable Dio `message/add` adapter for text, image, and video multipart requests; upload progress is reported through existing repository callback.
+- Replaceable WebSocket adapter for Gespraech `OnMessageReceivedData` envelopes, including text/image/video mapping and unsupported-type filtering.
+- Connection state stream and banner for connecting, reconnecting, offline, error, and disconnected states; WebSocket adapter retries dropped connections with exponential backoff and enters offline after the configured attempt cap.
 - Uploading, sending, failed, and retry states with inline progress indicator.
 - Scrollable message history.
 - Fixed bottom composer.
@@ -31,6 +35,10 @@ Supported UI flows:
 - [Media picker service](../../lib/chat/application/media_picker_service.dart)
 - [Riverpod providers](../../lib/chat/presentation/chat_providers.dart)
 - [Media preview dialogs](../../lib/chat/presentation/widgets/media_preview_dialog.dart)
+- [Video player dialog](../../lib/chat/presentation/widgets/video_player_dialog.dart)
+- [Dio message adapters](../../lib/chat/data/remote/dio_message_data_sources.dart)
+- [WebSocket message adapter](../../lib/chat/data/remote/web_socket_message_event_source.dart)
+- [Remote message mapper](../../lib/chat/data/remote/remote_message_mapper.dart)
 - [Chat shell](../../lib/chat/presentation/chat_shell.dart)
 - [Pet bubble wrapper](../../lib/pet/domain/pet_message_bubble.dart)
 
@@ -42,7 +50,8 @@ ChatShell
   -> MediaPolicy validation
   -> roomMessagesProvider(roomId)
   -> MessageRepository
-  -> Fake remote/upload/event adapters (or future Gespraech transport)
+  -> Fake remote/upload/event adapters (default UI wiring)
+  -> Dio/WebSocket adapters (available for backend composition)
 ```
 
 Composer sends `MessageDraft`. Repository owns optimistic insertion, upload
@@ -69,7 +78,7 @@ flutter test
 flutter analyze
 ```
 
-Current verification: 51 tests passed; analyzer clean.
+Current verification: 53 tests passed; analyzer clean.
 
 ### Platform notes (macOS Desktop)
 - App Sandbox requires `<key>com.apple.security.files.user-selected.read-only</key><true/>` in both `DebugProfile.entitlements` and `Release.entitlements` to read files chosen by the user in Finder via `image_picker`.
@@ -77,8 +86,8 @@ Current verification: 51 tests passed; analyzer clean.
 
 ## Next work
 
-1. Add real Dio/WebSocket adapters behind existing data-source interfaces (`MessageRemoteDataSource`, `MediaUploadDataSource`, `MessageEventSource`).
-2. Add connection state indicator / banner (reconnect states, offline notifications).
+1. Compose authenticated Dio/WebSocket instances in production provider.
+2. Validate live backend response fields and reconnect/backoff policy against staging.
 3. Add unread boundary, pagination, and persistence only when product scope requires them.
 
 ## Important boundaries

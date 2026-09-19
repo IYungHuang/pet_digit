@@ -31,9 +31,17 @@ class FakeMessageRepository implements MessageRepository {
   @override
   Future<void> connect() async {
     if (_connected) return;
-    await events.connect();
     _eventSubscription = events.events().listen(_handleIncoming);
     _connected = true;
+    try {
+      await events.connect();
+    } catch (_) {
+      _connected = false;
+      await _eventSubscription?.cancel();
+      _eventSubscription = null;
+      await events.disconnect();
+      rethrow;
+    }
   }
 
   @override
@@ -76,7 +84,7 @@ class FakeMessageRepository implements MessageRepository {
     _upsert(ChatMessage.fromDraft(draft));
 
     var effectiveDraft = draft;
-    if (_requiresUpload(draft.content)) {
+    if (_requiresUpload(draft.content) && !upload.isAtomicUpload) {
       _update(
         draft.clientId,
         (message) => message.copyWith(
@@ -114,14 +122,33 @@ class FakeMessageRepository implements MessageRepository {
     _update(
       draft.clientId,
       (message) => message.copyWith(
-        status: MessageDeliveryStatus.sending,
+        status: _requiresUpload(draft.content) && upload.isAtomicUpload
+            ? MessageDeliveryStatus.uploading
+            : MessageDeliveryStatus.sending,
         error: null,
-        uploadProgress: _requiresUpload(draft.content) ? 1 : 0,
+        uploadProgress: _requiresUpload(draft.content) && upload.isAtomicUpload
+            ? 0
+            : (_requiresUpload(draft.content) ? 1 : 0),
       ),
     );
 
     try {
-      final receipt = await remote.send(effectiveDraft);
+      final receipt = await remote.send(
+        effectiveDraft,
+        onProgress: (progress) {
+          onUploadProgress?.call(progress);
+          if (_requiresUpload(draft.content) && upload.isAtomicUpload) {
+            _update(
+              draft.clientId,
+              (message) => message.copyWith(
+                status: MessageDeliveryStatus.uploading,
+                uploadProgress: progress,
+                error: null,
+              ),
+            );
+          }
+        },
+      );
       return _update(
         draft.clientId,
         (message) => message.copyWith(

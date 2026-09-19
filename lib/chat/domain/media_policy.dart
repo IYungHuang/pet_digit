@@ -3,6 +3,8 @@ enum MediaKind { image, video }
 class MediaPolicy {
   const MediaPolicy._();
 
+  static const maxMediaSizeBytes = 50 * 1024 * 1024;
+
   static const imageMimeTypes = <String>{
     'image/jpeg',
     'image/png',
@@ -10,10 +12,7 @@ class MediaPolicy {
     'image/webp',
   };
 
-  static const videoMimeTypes = <String>{
-    'video/mp4',
-    'video/quicktime',
-  };
+  static const videoMimeTypes = <String>{'video/mp4', 'video/quicktime'};
 
   static bool isSupportedMimeType(String mimeType) {
     final normalized = mimeType.trim().toLowerCase();
@@ -77,6 +76,7 @@ class MediaPolicy {
   static MediaValidationResult validate({
     required String path,
     String? mimeType,
+    int? sizeBytes,
     int? maxSizeBytes,
   }) {
     final effectiveMime = (mimeType != null && mimeType.trim().isNotEmpty)
@@ -91,15 +91,17 @@ class MediaPolicy {
 
     final kind = kindForMimeType(effectiveMime);
     if (kind == null) {
+      return const MediaValidationResult.invalid(errorMessage: '不支援的媒體類型');
+    }
+
+    final sizeLimit = maxSizeBytes ?? maxMediaSizeBytes;
+    if (sizeBytes != null && sizeBytes > sizeLimit) {
       return const MediaValidationResult.invalid(
-        errorMessage: '不支援的媒體類型',
+        errorMessage: '檔案太大，媒體檔案上限為 50MB',
       );
     }
 
-    return MediaValidationResult.valid(
-      kind: kind,
-      mimeType: effectiveMime,
-    );
+    return MediaValidationResult.valid(kind: kind, mimeType: effectiveMime);
   }
 }
 
@@ -107,18 +109,16 @@ class MediaValidationResult {
   const MediaValidationResult.valid({
     required this.kind,
     required this.mimeType,
-  })  : isValid = true,
-        errorMessage = null;
+  }) : isValid = true,
+       errorMessage = null;
 
-  const MediaValidationResult.invalid({
-    required this.errorMessage,
-  })  : isValid = false,
-        kind = null,
-        mimeType = null;
+  const MediaValidationResult.invalid({required this.errorMessage})
+    : isValid = false,
+      kind = null,
+      mimeType = null;
 
   final bool isValid;
   final MediaKind? kind;
   final String? mimeType;
   final String? errorMessage;
 }
-

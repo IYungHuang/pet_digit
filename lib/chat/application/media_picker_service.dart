@@ -4,10 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../domain/media_policy.dart';
 
-enum MediaPickerSource {
-  gallery,
-  camera,
-}
+enum MediaPickerSource { gallery, camera }
 
 class PickedMediaFile {
   const PickedMediaFile({
@@ -48,7 +45,7 @@ abstract interface class MediaPickerService {
 
 class NativeMediaPickerService implements MediaPickerService {
   NativeMediaPickerService({ImagePicker? picker})
-      : _picker = picker ?? ImagePicker();
+    : _picker = picker ?? ImagePicker();
 
   final ImagePicker _picker;
 
@@ -78,20 +75,21 @@ class NativeMediaPickerService implements MediaPickerService {
     }
     if (file == null) return null;
 
+    int? size;
+    try {
+      size = await file.length();
+    } catch (_) {}
+
     final validation = MediaPolicy.validate(
       path: file.path,
       mimeType: file.mimeType,
+      sizeBytes: size,
     );
     if (!validation.isValid) {
       throw MediaValidationException(
         validation.errorMessage ?? '不支援的圖片格式，僅支援 JPG, PNG, GIF, WebP',
       );
     }
-
-    int? size;
-    try {
-      size = await file.length();
-    } catch (_) {}
 
     return PickedMediaFile(
       path: file.path,
@@ -128,20 +126,21 @@ class NativeMediaPickerService implements MediaPickerService {
     }
     if (file == null) return null;
 
+    int? size;
+    try {
+      size = await file.length();
+    } catch (_) {}
+
     final validation = MediaPolicy.validate(
       path: file.path,
       mimeType: file.mimeType,
+      sizeBytes: size,
     );
     if (!validation.isValid) {
       throw MediaValidationException(
         validation.errorMessage ?? '不支援的影片格式，僅支援 MP4, MOV',
       );
     }
-
-    int? size;
-    try {
-      size = await file.length();
-    } catch (_) {}
 
     return PickedMediaFile(
       path: file.path,

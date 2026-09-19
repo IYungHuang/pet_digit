@@ -1,17 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 
 import '../application/media_picker_service.dart';
 import '../data/fake/fake_media_upload_data_source.dart';
 import '../data/fake/fake_message_event_source.dart';
 import '../data/fake/fake_message_remote_data_source.dart';
 import '../data/fake/fake_message_repository.dart';
+import '../data/message_data_sources.dart';
+import '../data/remote/dio_message_data_sources.dart';
+import '../data/remote/web_socket_message_event_source.dart';
 import '../domain/chat_message.dart';
 import '../domain/message_content.dart';
 import '../domain/message_draft.dart';
 import '../domain/message_repository.dart';
 import '../domain/message_status.dart';
+import '../domain/message_connection_state.dart';
 
 typedef SendMessage =
     Future<ChatMessage> Function(
@@ -19,16 +24,65 @@ typedef SendMessage =
       void Function(double progress)? onUploadProgress,
     });
 
-final chatRepositoryProvider = Provider<MessageRepository>((ref) {
-  final repository = FakeMessageRepository(
-    remote: FakeMessageRemoteDataSource(),
-    upload: FakeMediaUploadDataSource(),
-    events: FakeMessageEventSource(),
+final chatEventSourceProvider = Provider<MessageEventSource>((ref) {
+  if (ref.watch(useBackendTransportProvider)) {
+    return ref.watch(backendEventSourceProvider);
+  }
+  return FakeMessageEventSource();
+});
+
+final useBackendTransportProvider = Provider<bool>((ref) => false);
+
+final backendEventSourceProvider = Provider<MessageEventSource>((ref) {
+  return WebSocketMessageEventSource(
+    uri: ref.watch(backendWebSocketUriProvider),
   );
-  repository.seedMessages(_seedMessages);
+});
+
+final backendRemoteDataSourceProvider = Provider<MessageRemoteDataSource>((
+  ref,
+) {
+  return DioMessageRemoteDataSource(dio: ref.watch(backendDioProvider));
+});
+
+final backendUploadDataSourceProvider = Provider<MediaUploadDataSource>(
+  (ref) => DioMediaUploadDataSource(),
+);
+
+final chatRepositoryProvider = Provider<MessageRepository>((ref) {
+  final useBackend = ref.watch(useBackendTransportProvider);
+  final repository = FakeMessageRepository(
+    remote: useBackend
+        ? ref.watch(backendRemoteDataSourceProvider)
+        : FakeMessageRemoteDataSource(),
+    upload: useBackend
+        ? ref.watch(backendUploadDataSourceProvider)
+        : FakeMediaUploadDataSource(),
+    events: ref.watch(chatEventSourceProvider),
+  );
+  if (!useBackend) repository.seedMessages(_seedMessages);
   ref.onDispose(() => unawaited(repository.dispose()));
   return repository;
 });
+
+/// Production composition seam. App bootstrap must override Dio and URI with
+/// authenticated instances; demo/tests intentionally keep [chatRepositoryProvider]
+/// fake-first.
+final backendDioProvider = Provider<Dio>(
+  (ref) => throw StateError('backendDioProvider requires app composition'),
+);
+
+final backendWebSocketUriProvider = Provider<Uri>(
+  (ref) =>
+      throw StateError('backendWebSocketUriProvider requires app composition'),
+);
+
+final messageConnectionStateProvider = StreamProvider.autoDispose
+    .family<MessageConnectionState, String>((ref, _) async* {
+      final source = ref.watch(chatEventSourceProvider);
+      yield MessageConnectionState.disconnected;
+      yield* source.connectionStates();
+    });
 
 final chatConnectionProvider = FutureProvider.autoDispose<void>((ref) async {
   final repository = ref.watch(chatRepositoryProvider);
