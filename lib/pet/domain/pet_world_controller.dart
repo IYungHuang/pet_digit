@@ -363,29 +363,41 @@ class PetWorldController implements PetBehaviorRuntime {
     return target;
   }
 
-  void _beginRuntimeAction(PetInteractable target, Object? payload) {
-    _activeTarget = target;
+  PetInteractable _beginRuntimeAction(
+    PetInteractable target,
+    Object? payload, {
+    required double platformImpulse,
+  }) {
+    _cancelActiveRuntimeArtifacts(platformImpulse: platformImpulse);
+    final liveTarget = _objectForId(target.id) ?? target;
+    _activeTarget = liveTarget;
     _activePayload = payload;
     _actionElapsed = 0.0;
     _time = 0.0;
     _dustTimer = 0.0;
     _stepBounceTimer = 0.0;
+    return liveTarget;
+  }
+
+  void _cancelActiveRuntimeArtifacts({required double platformImpulse}) {
+    if (currentPlatform != null) {
+      triggerBubbleImpulse(currentPlatform!.id, platformImpulse);
+      currentPlatform = null;
+    }
+    bouncingToy = null;
+    _walkTowardObservationTarget = false;
   }
 
   // --- Platform Jump (Standing/Walking on Bubble with Spring Landing) ---
   @override
   void startJumpToPlatform(PetBoundedInteractable target) {
-    _beginRuntimeAction(target, null);
-    _startJumpToPlatform(target);
+    final liveTarget = _beginRuntimeAction(target, null, platformImpulse: 60.0);
+    _startJumpToPlatform(
+      liveTarget is PetBoundedInteractable ? liveTarget : target,
+    );
   }
 
   void _startJumpToPlatform(PetBoundedInteractable target) {
-    // If leaving a platform, trigger push-off recoil on previous platform
-    if (currentPlatform != null) {
-      triggerBubbleImpulse(currentPlatform!.id, 60.0);
-      currentPlatform = null;
-    }
-
     currentAction = PetActionType.jumpToPlatform;
     final bounds = target.bounds;
     final maxBoundX = math.max(bounds.left + 4, bounds.right - 56).toDouble();
@@ -451,17 +463,15 @@ class PetWorldController implements PetBehaviorRuntime {
   // --- Emoji Chase (Video 2: Emoji Bouncing & Corgi Chasing) ---
   @override
   void startChaseEmoji(PetInteractable target, {required Object? payload}) {
-    _beginRuntimeAction(target, payload);
-    _startChaseEmoji(target, payload: payload);
+    final liveTarget = _beginRuntimeAction(
+      target,
+      payload,
+      platformImpulse: 70.0,
+    );
+    _startChaseEmoji(liveTarget, payload: payload);
   }
 
   void _startChaseEmoji(PetInteractable target, {required Object? payload}) {
-    // If corgi is on platform, leave platform with recoil push-off
-    if (currentPlatform != null) {
-      triggerBubbleImpulse(currentPlatform!.id, 70.0);
-      currentPlatform = null;
-    }
-
     currentAction = PetActionType.chaseEmoji;
     state = PetState.pounce;
 
@@ -529,16 +539,15 @@ class PetWorldController implements PetBehaviorRuntime {
   // --- GIF Observe (Video 1: Look up -> Hearts -> Approach -> Paw on Bubble) ---
   @override
   void startInspectGif(PetInteractable target, {required Object? payload}) {
-    _beginRuntimeAction(target, payload);
-    _startInspectGif(target);
+    final liveTarget = _beginRuntimeAction(
+      target,
+      payload,
+      platformImpulse: 60.0,
+    );
+    _startInspectGif(liveTarget);
   }
 
   void _startInspectGif(PetInteractable target) {
-    if (currentPlatform != null) {
-      triggerBubbleImpulse(currentPlatform!.id, 60.0);
-      currentPlatform = null;
-    }
-
     currentAction = PetActionType.inspectGif;
     state = PetState.observe;
   }
@@ -599,7 +608,7 @@ class PetWorldController implements PetBehaviorRuntime {
 
   @override
   void startObserveTarget(PetInteractable target, {required bool walkToward}) {
-    _beginRuntimeAction(target, null);
+    _beginRuntimeAction(target, null, platformImpulse: 60.0);
     currentAction = PetActionType.observeTarget;
     _walkTowardObservationTarget = walkToward;
     state = walkToward ? PetState.walk : PetState.observe;

@@ -86,6 +86,68 @@ void main() {
     expect(controller.activeTarget?.id, target.id);
   });
 
+  test('fallback observe clears a landed platform runtime', () {
+    final controller = PetWorldController();
+    final platform = _target(
+      id: 'platform',
+      kind: WorldObjectKind.platform,
+      contentKind: PetNormalizedContentKind.text,
+      payload: 'hello',
+    );
+    controller.objects = [platform];
+    controller.interact(platform.id);
+    controller.tick(const Duration(milliseconds: 600));
+
+    final result = PetBehaviorExecutor(controller).execute(
+      _selection(
+        PetBehaviorAction.hidePeek,
+        PetBehaviorCapability.unsupported,
+        targetId: 'observe',
+      ),
+      _target(
+        id: 'observe',
+        kind: WorldObjectKind.platform,
+        contentKind: PetNormalizedContentKind.text,
+        payload: 'new object',
+      ),
+    );
+
+    expect(result.status, PetBehaviorExecutionStatus.fallback);
+    expect(controller.currentAction, PetActionType.observeTarget);
+    expect(controller.currentPlatform, isNull);
+  });
+
+  test('circle fallback clears an active chase toy', () {
+    final controller = PetWorldController();
+    final target = _target(
+      kind: WorldObjectKind.emojiToy,
+      contentKind: PetNormalizedContentKind.emoji,
+      payload: '🎾',
+    );
+    PetBehaviorExecutor(controller).execute(
+      _selection(PetBehaviorAction.runChase, PetBehaviorCapability.native),
+      target,
+    );
+
+    final result = PetBehaviorExecutor(controller).execute(
+      _selection(
+        PetBehaviorAction.circleSniff,
+        PetBehaviorCapability.degraded,
+        targetId: 'circle',
+      ),
+      _target(
+        id: 'circle',
+        kind: WorldObjectKind.platform,
+        contentKind: PetNormalizedContentKind.text,
+        payload: 'new object',
+      ),
+    );
+
+    expect(result.status, PetBehaviorExecutionStatus.fallback);
+    expect(controller.currentAction, PetActionType.observeTarget);
+    expect(controller.bouncingToy, isNull);
+  });
+
   test('unsupported action is ignored without fake motion', () {
     final controller = PetWorldController();
     final activeTarget = _target(
@@ -151,22 +213,24 @@ void main() {
 
 PetBehaviorSelection _selection(
   PetBehaviorAction action,
-  PetBehaviorCapability capability,
-) => PetBehaviorSelection(
+  PetBehaviorCapability capability, {
+  String targetId = 'target',
+}) => PetBehaviorSelection(
   action: action,
   stimulusType: PetStimulusType.userTap,
-  targetId: 'target',
+  targetId: targetId,
   capability: capability,
   reason: 'test:$action',
 );
 
 PetMessageTarget _target({
+  String id = 'target',
   required WorldObjectKind kind,
   required PetNormalizedContentKind contentKind,
   required Object? payload,
 }) {
   final target = PetMessageTarget(
-    id: 'target',
+    id: id,
     kind: kind,
     contentKind: contentKind,
     payload: payload,

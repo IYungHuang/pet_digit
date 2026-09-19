@@ -50,3 +50,42 @@ PASS.
 ## Review
 
 Self-review found no unresolved Task 4 defects. No subagents used. No packages, assets, or backend files changed.
+
+## Fix Round 1/5
+
+### Root Cause
+
+- Dispatch-created target copies became action-owned targets. Collection bounds updates therefore missed landed and inspected runtime targets.
+- New observe/circle actions reset action timing but retained `currentPlatform` and `bouncingToy` from interrupted actions.
+
+### TDD Evidence
+
+RED:
+
+```text
+flutter test test/pet/pet_behavior_executor_test.dart test/pet/pet_world_test.dart
+FAILED: live platform identity detached after dispatch; fallback observe retained currentPlatform; circle fallback retained BouncingEmojiToy.
+```
+
+GREEN:
+
+```text
+flutter test test/pet/pet_behavior_executor_test.dart test/pet/pet_world_test.dart
+PASS: 12 tests.
+```
+
+### Verification
+
+```text
+flutter analyze
+PASS: No issues found.
+
+git diff --check
+PASS.
+```
+
+### Scope
+
+- Runtime resolves the collection object by target ID before ownership transfers, retaining live geometry without collection migration.
+- Every executed or fallback runtime start now clears previous platform and chase artifacts before entering its new action.
+- Task 5 reconciliation/pending retry and deferred Minor unready-ID finding remain unchanged.

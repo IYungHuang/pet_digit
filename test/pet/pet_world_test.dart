@@ -84,6 +84,30 @@ void main() {
     expect(controller.currentAction, PetActionType.none);
     expect(controller.activeTarget, isNull);
   });
+
+  test('landed target keeps updated live bounds on subsequent tick', () {
+    final controller = PetWorldController();
+    final platform = _target(
+      id: 'platform',
+      kind: WorldObjectKind.platform,
+      contentKind: PetNormalizedContentKind.text,
+      payload: 'hello',
+    );
+    controller.objects = [platform];
+
+    controller.interact(platform.id);
+    controller.tick(const Duration(milliseconds: 600));
+    controller.updateObjectBounds({
+      platform.id: const Rect.fromLTWH(120, 300, 180, 52),
+    });
+    controller.tick(const Duration(milliseconds: 16));
+
+    expect(controller.currentPlatform, same(platform));
+    expect(
+      controller.position.dy,
+      closeTo(248 + controller.getBubbleDeflection(platform.id), 0.001),
+    );
+  });
 }
 
 PetMessageTarget _target({
