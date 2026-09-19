@@ -1,48 +1,51 @@
 import 'dart:ui';
 
 import '../../chat/domain/chat_message.dart';
-import '../../chat/domain/message_content.dart';
+import 'pet_message_content_kind.dart';
+import 'pet_message_target.dart';
+import 'pet_message_target_factory.dart';
 import 'pet_world.dart';
 
+/// Compatibility adapter for callers that still construct bubble targets.
 class PetMessageBubbleTarget implements PetBoundedInteractable {
   PetMessageBubbleTarget({required this.message, Rect? bounds})
-    : bounds = bounds ?? const Rect.fromLTWH(0, 0, 180, 52);
+    : _target = PetMessageTargetFactory.fromDomainMessage(message) {
+    if (bounds != null) {
+      _target.markMeasuredBounds(bounds);
+    }
+  }
 
   final ChatMessage message;
-  @override
-  Rect bounds;
+  final PetMessageTarget _target;
+
+  PetMessageTargetData get data => _target;
+
+  PetNormalizedContentKind get contentKind => _target.contentKind;
+
+  Object? get payload => _target.payload;
+
+  String get messageText => _target.messageText;
 
   @override
-  String get id => message.clientId;
+  Rect get bounds => _target.bounds;
 
   @override
-  Offset get position => bounds.topLeft;
+  bool get hasMeasuredBounds => _target.hasMeasuredBounds;
 
   @override
-  WorldObjectKind get kind => switch (message.content) {
-    TextMessageContent(:final text) when _isEmojiOnly(text) =>
-      WorldObjectKind.emojiToy,
-    TextMessageContent() => WorldObjectKind.platform,
-    ImageMessageContent() ||
-    VideoMessageContent() => WorldObjectKind.animatedToy,
-  };
+  String get id => _target.id;
 
   @override
-  PetState interactionFor(PetEvent event) => switch (kind) {
-    WorldObjectKind.platform => PetState.jump,
-    WorldObjectKind.emojiToy => PetState.pounce,
-    WorldObjectKind.animatedToy => PetState.observe,
-  };
+  Offset get position => _target.position;
+
+  @override
+  WorldObjectKind get kind => _target.kind;
+
+  @override
+  PetState interactionFor(PetEvent event) => _target.interactionFor(event);
 
   @override
   void updateBounds(Rect newBounds) {
-    bounds = newBounds;
-  }
-
-  static bool _isEmojiOnly(String value) {
-    final text = value.trim();
-    return text.isNotEmpty &&
-        text.runes.length <= 4 &&
-        !RegExp(r'[A-Za-z0-9\u4e00-\u9fff]').hasMatch(text);
+    _target.markMeasuredBounds(newBounds);
   }
 }

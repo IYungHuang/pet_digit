@@ -87,6 +87,9 @@ abstract interface class PetInteractable {
 }
 
 abstract interface class PetBoundedInteractable implements PetInteractable {
+  /// Whether bounds came from an actual layout measurement.
+  bool get hasMeasuredBounds;
+
   void updateBounds(Rect newBounds);
 }
 
@@ -102,6 +105,9 @@ class MessageWorldObject implements PetBoundedInteractable {
   final Offset position;
   @override
   Rect bounds;
+
+  @override
+  bool get hasMeasuredBounds => true;
 
   @override
   void updateBounds(Rect newBounds) {

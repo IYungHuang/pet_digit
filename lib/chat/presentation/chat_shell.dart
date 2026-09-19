@@ -258,7 +258,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
 
   void _interact(ChatMessage message) {
     _syncBubbleBounds();
-    _world.interact(message.clientId);
+    _world.interact(message.serverId ?? message.clientId);
     setState(() {});
   }
 
