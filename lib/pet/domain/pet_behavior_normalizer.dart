@@ -15,6 +15,7 @@ class PetBehaviorNormalizer {
     stimulusType: stimulusType,
     petType: petType,
     targetId: target.id,
+    sourceIdentity: target.sourceIdentity,
     targetKind: target.kind,
     contentKind: target.contentKind,
     payload: target.payload,

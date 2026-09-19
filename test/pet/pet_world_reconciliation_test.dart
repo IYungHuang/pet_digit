@@ -175,6 +175,118 @@ void main() {
     expect(notifications, 1);
   });
 
+  test('stale room stimulus preserves the current room active action', () {
+    final controller = PetWorldController()
+      ..setMessageBubbleTargets([_message(roomId: 'room-a')]);
+    final stale = PetBehaviorNormalizer.fromTarget(
+      controller.objects.single,
+      PetStimulusType.userTap,
+      petType: PetType.corgi,
+    );
+    controller.setMessageBubbleTargets([
+      _message(roomId: 'room-b'),
+      _message(roomId: 'room-b', clientId: 'active', text: '🎾'),
+    ]);
+    controller.updateObjectBounds({'client': _bounds, 'active': _bounds});
+    controller.interact('active');
+    final active = controller.activeTarget;
+    final toy = controller.bouncingToy;
+    final position = controller.position;
+    final state = controller.state;
+
+    expect(
+      controller.dispatch(stale).status,
+      PetBehaviorExecutionStatus.ignored,
+    );
+    expect(controller.activeTarget, same(active));
+    expect(controller.activePayload, '🎾');
+    expect(controller.bouncingToy, same(toy));
+    expect(controller.currentAction, PetActionType.chaseEmoji);
+    expect(controller.state, state);
+    expect(controller.position, position);
+    controller.tick(const Duration(seconds: 10));
+    controller.updateObjectBounds({'client': _bounds});
+    expect(controller.currentAction, PetActionType.none);
+    expect(controller.activeTarget, same(active));
+  });
+
+  test('stale room stimulus preserves landed runtime and pending stimulus', () {
+    final controller = PetWorldController()
+      ..setMessageBubbleTargets([_message(roomId: 'room-a')]);
+    final stale = PetBehaviorNormalizer.fromTarget(
+      controller.objects.single,
+      PetStimulusType.userTap,
+      petType: PetType.corgi,
+    );
+    controller.setMessageBubbleTargets([
+      _message(roomId: 'room-b'),
+      _message(roomId: 'room-b', clientId: 'platform'),
+      _message(roomId: 'room-b', clientId: 'pending', text: '🎾'),
+    ]);
+    controller.updateObjectBounds({'platform': _bounds});
+    controller.interact('platform');
+    controller.tick(const Duration(milliseconds: 600));
+    controller.tick(const Duration(milliseconds: 16));
+    final platform = controller.currentPlatform;
+    final position = controller.position;
+    final deflection = controller.getBubbleDeflection('platform');
+    controller.interact('pending');
+
+    expect(
+      controller.dispatch(stale).status,
+      PetBehaviorExecutionStatus.ignored,
+    );
+    expect(controller.activeTarget, same(platform));
+    expect(controller.currentPlatform, same(platform));
+    expect(controller.currentAction, PetActionType.none);
+    expect(controller.state, PetState.idle);
+    expect(controller.position, position);
+    expect(controller.getBubbleDeflection('platform'), deflection);
+
+    controller.updateObjectBounds({'pending': _bounds});
+    expect(controller.currentAction, PetActionType.chaseEmoji);
+    expect(controller.activeTarget?.id, 'pending');
+    expect(controller.bouncingToy?.emoji, '🎾');
+    controller.tick(const Duration(seconds: 10));
+    controller.updateObjectBounds({'client': _bounds});
+    expect(controller.currentAction, PetActionType.none);
+    expect(controller.activeTarget?.id, 'pending');
+  });
+
+  test('pending retry rejects changed source under the same canonical ID', () {
+    final controller = PetWorldController()
+      ..setMessageBubbleTargets([
+        _message(clientId: 'first', serverId: 'server'),
+      ])
+      ..interact('server');
+    controller.setMessageBubbleTargets([
+      _message(clientId: 'second', serverId: 'server'),
+    ]);
+    controller.updateObjectBounds({'server': _bounds});
+    expect(controller.currentAction, PetActionType.none);
+    expect(controller.activeTarget, isNull);
+  });
+
+  test('stimulus without source cannot queue work for a domain target', () {
+    final controller = PetWorldController()
+      ..setMessageBubbleTargets([_message()]);
+    const stimulus = PetBehaviorStimulus(
+      stimulusType: PetStimulusType.userTap,
+      petType: PetType.corgi,
+      targetId: 'client',
+      targetKind: WorldObjectKind.platform,
+      contentKind: PetNormalizedContentKind.text,
+      payload: 'hello',
+    );
+    expect(
+      controller.dispatch(stimulus).status,
+      PetBehaviorExecutionStatus.ignored,
+    );
+    controller.updateObjectBounds({'client': _bounds});
+    expect(controller.currentAction, PetActionType.none);
+    expect(controller.activeTarget, isNull);
+  });
+
   test('reordering identical content reconciles by source identity', () {
     final controller = PetWorldController()
       ..setMessageBubbleTargets([

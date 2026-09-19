@@ -75,3 +75,43 @@ The first commit attempt failed in the repository pre-commit hook, before its te
 Self-reviewed the controller, target/factory changes, reconciliation tests, and legacy fixture updates against Task 5 requirements. No unresolved Task 5 findings. No backend, packages, assets, or UI production files changed. No automatic dispatch was added to target installation or measurement; measurement only retries an explicitly received pending stimulus.
 
 Legacy target classes remain available for external compatibility, but the controller neither constructs nor stores them. The previously deferred Task 4 executor-test ID mismatch remains outside this change; the new controller regression uses matching IDs and exercises the unready-bounds path directly.
+
+## Fix Round 1/5: Reject Stale Message Sources
+
+### Finding and Change
+
+Review identified that saved stimuli carried only a canonical target ID and content metadata. Although collection reconciliation checked room identity, dispatch could resolve a room-A stimulus to a room-B target with the same client ID and content. An unmeasured stale stimulus could also replace valid pending work.
+
+The review workflow verified the finding with behavioral tests before changing production code. `PetBehaviorStimulus` now carries the optional `(roomId, clientId)` source identity from `PetMessageTarget` through `PetBehaviorNormalizer`. Dispatch checks exact source identity before execution or pending assignment. Pending matching retains and revalidates the original source during reconciliation and before retry. Missing source metadata does not match a domain target with source metadata; legacy and standalone targets without metadata retain compatibility.
+
+No content or index matching was introduced. Existing tests confirm that pending work and active targets survive canonical client-to-server ID transitions when room/client source identity remains unchanged.
+
+### TDD Evidence
+
+RED, before production changes:
+
+```text
+flutter test --no-pub test/pet/pet_world_reconciliation_test.dart --reporter expanded
+FAIL: 4 failed, 26 passed.
+```
+
+The four failures demonstrated stale room-A execution replacing a room-B action, stale pending assignment replacing room-B pending work, pending retry after a source-client change under the same server ID, and missing-source stimuli queuing domain work.
+
+GREEN and focused verification:
+
+```text
+flutter test --no-pub test/pet/pet_world_reconciliation_test.dart test/pet/pet_behavior_selector_test.dart test/pet/pet_behavior_runtime_test.dart test/pet/pet_world_test.dart --reporter expanded
+PASS: 49 tests, including reconciliation, normalizer/selector, runtime, and controller coverage.
+
+flutter analyze --no-pub
+PASS: No issues found.
+
+git diff --check
+PASS.
+```
+
+Cross-room regressions assert that ignored dispatch preserves the current action, target, payload, toy, position, landed platform, spring deflection, and subsequent execution of the original room-B pending stimulus. The full suite was not repeated in this focused fix round.
+
+### Scope and Commit
+
+The deferred Task 4 executor-test ID mismatch remains untouched. No backend, packages, assets, automatic new-message dispatch, push, or subagents. The previously diagnosed Flutter/Git hook issue remains unchanged; this commit uses the same command-local hook override after the requested independent checks, without modifying repository hook configuration.

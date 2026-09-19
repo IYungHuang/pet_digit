@@ -387,6 +387,7 @@ class PetWorldController implements PetBehaviorRuntime {
       );
     }
     if (stimulus.petType != selectedPet ||
+        stimulus.sourceIdentity != target.sourceIdentity ||
         stimulus.targetKind != target.kind ||
         stimulus.contentKind != target.contentKind ||
         stimulus.payload != target.payload) {
@@ -831,6 +832,7 @@ class _PendingStimulus {
   final PetBehaviorAction action;
 
   bool matches(PetMessageTarget candidate) =>
+      candidate.sourceIdentity == stimulus.sourceIdentity &&
       candidate.kind == stimulus.targetKind &&
       candidate.contentKind == stimulus.contentKind &&
       candidate.payload == stimulus.payload;

@@ -17,6 +17,7 @@ class PetBehaviorStimulus {
     required this.targetKind,
     required this.contentKind,
     required this.payload,
+    this.sourceIdentity,
   });
 
   final PetStimulusType stimulusType;
@@ -25,6 +26,10 @@ class PetBehaviorStimulus {
   final WorldObjectKind targetKind;
   final PetNormalizedContentKind contentKind;
   final Object? payload;
+
+  /// Stable message source, independent of canonical target ID changes.
+  /// Omitted only for legacy or standalone targets without source metadata.
+  final ({String roomId, String clientId})? sourceIdentity;
 }
 
 /// Immutable catalog choice. Execution outcome remains separate.
