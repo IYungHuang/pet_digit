@@ -3,18 +3,21 @@ import 'pet_behavior_runtime.dart';
 
 /// Pure, deterministic catalog selector for normalized pet stimuli.
 class PetBehaviorSelector {
-  const PetBehaviorSelector();
+  const PetBehaviorSelector({this.triggerOverrides = const {}});
+
+  final Map<PetStimulusType, List<PetBehaviorTrigger>> triggerOverrides;
 
   PetBehaviorSelection? select(PetBehaviorStimulus stimulus) {
     final profile = PetBehaviorCatalog.profiles[stimulus.petType];
     if (profile == null) return null;
 
-    final triggers = switch (stimulus.stimulusType) {
+    final defaultTriggers = switch (stimulus.stimulusType) {
       PetStimulusType.userTap => PetBehaviorCatalog.legacyTapTriggers,
       PetStimulusType.newMessageBubble =>
         PetBehaviorCatalog.novelObjectTriggers,
       _ => const <PetBehaviorTrigger>[],
     };
+    final triggers = triggerOverrides[stimulus.stimulusType] ?? defaultTriggers;
     final profileActions =
         stimulus.stimulusType == PetStimulusType.newMessageBubble
         ? profile.novelObjectActions
@@ -52,6 +55,7 @@ class PetBehaviorSelector {
     required List<PetBehaviorAction> profileActions,
     required PetBehaviorStimulus stimulus,
   }) {
+    if (trigger.stimulus != stimulus.stimulusType) return false;
     if (trigger.petType != null && trigger.petType != stimulus.petType) {
       return false;
     }

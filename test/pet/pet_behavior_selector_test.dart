@@ -189,6 +189,32 @@ void main() {
     expect(newMessage?.action, PetBehaviorAction.approachArc);
   });
 
+  test('rejects a new-message trigger misfiled in the user-tap source', () {
+    const selectorWithMisfiledTrigger = PetBehaviorSelector(
+      triggerOverrides: {
+        PetStimulusType.userTap: [
+          PetBehaviorTrigger(
+            stimulus: PetStimulusType.newMessageBubble,
+            action: PetBehaviorAction.nosePawBump,
+            petType: PetType.corgi,
+            priority: 20,
+          ),
+        ],
+      },
+    );
+
+    final selection = selectorWithMisfiledTrigger.select(
+      _stimulus(
+        PetType.corgi,
+        PetStimulusType.userTap,
+        WorldObjectKind.platform,
+        PetNormalizedContentKind.text,
+      ),
+    );
+
+    expect(selection, isNull);
+  });
+
   test('wrong target kind returns no candidate', () {
     final selection = selector.select(
       _stimulus(
