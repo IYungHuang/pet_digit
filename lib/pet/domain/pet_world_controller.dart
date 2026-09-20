@@ -16,6 +16,7 @@ import 'pet_behavior_selector.dart';
 import 'pet_message_target.dart';
 import 'pet_message_target_factory.dart';
 import 'pet_effects.dart';
+import 'pet_presentation_state.dart';
 import 'pet_world.dart';
 
 enum PetActionType {
@@ -128,6 +129,39 @@ class PetWorldController implements PetBehaviorRuntime {
 
   PetInteractable? get activeTarget => _actionRunner.target;
   Object? get activePayload => _actionRunner.payload;
+  PetPresentationState get presentationState {
+    final target = activeTarget;
+    final particleSnapshots = particles
+        .map(PetParticleSnapshot.fromParticle)
+        .toList(growable: false);
+    return PetPresentationState(
+      petType: selectedPet,
+      petState: state,
+      position: position,
+      direction: direction,
+      frameIndex: frameIndex,
+      surfaceY: currentSurfaceY,
+      heightAboveSurface: heightAboveSurface,
+      showActionBadge:
+          state == PetState.pounce ||
+          state == PetState.observe ||
+          state == PetState.pawTest ||
+          state == PetState.dogProbe ||
+          state == PetState.parrotProbe,
+      pawPrints: pawPrints.map(PetPawPrintSnapshot.fromPrint),
+      mainParticles: particleSnapshots.where(
+        (particle) => particle.kind == ParticleKind.dust,
+      ),
+      signatureParticles: particleSnapshots.where(
+        (particle) => particle.kind != ParticleKind.dust,
+      ),
+      toy: bouncingToy == null ? null : PetToySnapshot.fromToy(bouncingToy!),
+      activeTarget: target == null
+          ? null
+          : PetTargetSnapshot(id: target.id, bounds: target.bounds),
+    );
+  }
+
   int get frameIndex {
     if (currentAction != PetActionType.none) return _actionFrameIndex;
     switch (state) {

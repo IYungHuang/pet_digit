@@ -1,5 +1,39 @@
 # Chat Pet MVP Handoff Report
 
+## Pet runtime architecture update — 2026-09-20
+
+Pet runtime now separates decision, execution, lifecycle, action timelines, and
+render projection:
+
+```text
+PetBehaviorCatalog / Selector
+  -> immutable PetActionPlan
+  -> PetActionRunner (live target, clocks, lifecycle)
+  -> fresh action handler (timeline and effects)
+  -> PetPresentationState (deep immutable render snapshot)
+  -> PetWorldOverlay / PetAnimationCatalog
+```
+
+- `PetActionPlan` keeps immutable origin metadata. `PetActionRunner` owns live
+  canonical target/payload bindings, elapsed clocks, replacement/cancellation,
+  and natural-completion retention rules.
+- Seven focused handlers own jump, chase, inspect, observe, cat paw, dog probe,
+  and parrot probe timelines. `PetWorldController` remains room/reconciliation,
+  shared-world, pending-stimulus, and callback facade.
+- `PetAnimationCatalog` is presentation-owned and centralizes exact species and
+  state frame mappings. Domain code does not import it or resolve asset paths.
+- `PetPresentationState` copies pet scalars, surface/shadow inputs, ordered paw
+  prints, ground/signature particles, bouncing toy values, and active target
+  identity/bounds into unmodifiable value snapshots. Overlay reads one snapshot
+  per build; previous snapshots cannot change after ticks or reconciliation.
+- Bubble `springNotifier` remains independent. Overlay still uses
+  `IgnorePointer`, nearest-neighbor sprite rendering, and controller callbacks.
+  Omitted, explicit 64x64, and custom `PixelPet` sizes retain prior behavior.
+
+Flame, `flame_behaviors`, Forge2D, Rive, and Spine remain intentionally absent.
+Current synchronous Flutter runtime is preserved; engine adoption requires a
+separate measured migration proposal.
+
 ## Runtime integration update — 2026-09-19
 
 This section is the current pet runtime handoff. The original 2026-09-18 report below is retained as historical context; its test count, fixed-coordinate limitations, and proposed implementation phases are not the current runtime status.

@@ -9,6 +9,7 @@ import 'package:chat_pet_mvp/chat/data/fake/fake_message_event_source.dart';
 import 'package:chat_pet_mvp/chat/data/fake/fake_message_remote_data_source.dart';
 import 'package:chat_pet_mvp/chat/data/fake/fake_message_repository.dart';
 import 'package:chat_pet_mvp/chat/domain/chat_message.dart';
+import 'package:chat_pet_mvp/chat/domain/chat_models.dart' as legacy;
 import 'package:chat_pet_mvp/chat/domain/media_policy.dart';
 import 'package:chat_pet_mvp/chat/domain/message_content.dart';
 import 'package:chat_pet_mvp/chat/domain/message_status.dart';
@@ -16,9 +17,44 @@ import 'package:chat_pet_mvp/chat/presentation/chat_providers.dart';
 import 'package:chat_pet_mvp/chat/presentation/chat_shell.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_world.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_world_controller.dart';
+import 'package:chat_pet_mvp/pet/domain/pet_presentation_state.dart';
 import 'package:chat_pet_mvp/pet/presentation/pet_world_overlay.dart';
 
 void main() {
+  testWidgets('pet overlay reads one immutable snapshot per build', (
+    tester,
+  ) async {
+    final controller = _CountingPresentationController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Stack(
+            children: [
+              PetWorldOverlay(room: _overlayRoom, controller: controller),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    controller.presentationReads = 0;
+    await tester.pump(const Duration(milliseconds: 16));
+
+    expect(controller.presentationReads, 1);
+    final overlay = find.byType(PetWorldOverlay);
+    final ignorePointer = find.descendant(
+      of: overlay,
+      matching: find.byType(IgnorePointer),
+    );
+    expect(ignorePointer, findsOneWidget);
+    expect(tester.widget<IgnorePointer>(ignorePointer).ignoring, isTrue);
+    final sprite = tester.widget<Image>(
+      find.descendant(of: overlay, matching: find.byType(Image)).first,
+    );
+    expect(sprite.filterQuality, FilterQuality.none);
+    expect(sprite.isAntiAlias, isFalse);
+  });
+
   testWidgets('shows active room messages and switches rooms', (tester) async {
     await tester.pumpWidget(const ChatPetApp());
     await _pumpChat(tester);
@@ -459,6 +495,23 @@ void main() {
 
     expect(find.byIcon(Icons.close_rounded), findsNothing);
   });
+}
+
+const _overlayRoom = legacy.ChatRoom(
+  id: 'snapshot-room',
+  name: 'Snapshot',
+  subtitle: '',
+  messages: [],
+);
+
+class _CountingPresentationController extends PetWorldController {
+  int presentationReads = 0;
+
+  @override
+  PetPresentationState get presentationState {
+    presentationReads++;
+    return super.presentationState;
+  }
 }
 
 Future<void> _pumpChat(WidgetTester tester) async {

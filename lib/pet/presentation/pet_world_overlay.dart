@@ -2,7 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../chat/domain/chat_models.dart';
-import '../domain/pet_effects.dart';
+import '../domain/pet_effects.dart' show ParticleKind;
+import '../domain/pet_presentation_state.dart';
 import '../domain/pet_world.dart';
 import '../domain/pet_world_controller.dart';
 import 'pixel_pet.dart';
@@ -50,13 +51,15 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
 
   @override
   Widget build(BuildContext context) {
-    final surfaceY = widget.controller.currentSurfaceY;
-    final h = widget.controller.heightAboveSurface;
+    final presentation = widget.controller.presentationState;
+    final config = PetConfig.of(presentation.petType);
+    final surfaceY = presentation.surfaceY;
+    final h = presentation.heightAboveSurface;
     final shadowScale = (1.0 - (h / 120.0)).clamp(0.55, 1.0);
     final shadowWidth = 38.0 * shadowScale;
     final shadowHeight = 8.0 * shadowScale;
     final shadowOpacity = (0.28 * (1.0 - (h / 90.0))).clamp(0.08, 0.28);
-    final shadowCenterX = widget.controller.position.dx + 32.0;
+    final shadowCenterX = presentation.position.dx + 32.0;
 
     return Positioned.fill(
       child: IgnorePointer(
@@ -65,7 +68,7 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
           clipBehavior: Clip.none,
           children: [
             // 1. Render paw prints / feather trails (fading footsteps left behind while walking/running)
-            for (final paw in widget.controller.pawPrints)
+            for (final paw in presentation.pawPrints)
               Positioned(
                 left: paw.position.dx - 8,
                 top: paw.position.dy - 8,
@@ -76,7 +79,7 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
                         ? (math.pi / 2 + (paw.isLeftPaw ? -0.12 : 0.12))
                         : (-math.pi / 2 + (paw.isLeftPaw ? -0.12 : 0.12)),
                     child: Image.asset(
-                      widget.controller.petConfig.trailAsset,
+                      config.trailAsset,
                       width: 16,
                       height: 16,
                       fit: BoxFit.contain,
@@ -107,17 +110,15 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
             ),
 
             // 3. Render ground particles (dust puffs under feet)
-            for (final particle in widget.controller.particles.where(
-              (p) => p.kind == ParticleKind.dust,
-            ))
+            for (final particle in presentation.mainParticles)
               Positioned(
-                left: particle.position.dx - particle.currentSize / 2,
-                top: particle.position.dy - particle.currentSize / 2,
+                left: particle.position.dx - particle.size / 2,
+                top: particle.position.dy - particle.size / 2,
                 child: Opacity(
                   opacity: particle.opacity,
                   child: Container(
-                    width: particle.currentSize,
-                    height: particle.currentSize,
+                    width: particle.size,
+                    height: particle.size,
                     decoration: const BoxDecoration(
                       color: Color(0x778892a4),
                       shape: BoxShape.circle,
@@ -127,14 +128,14 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
               ),
 
             // 4. Render bouncing emoji toy (Video 2: Emoji chasing)
-            if (widget.controller.bouncingToy != null)
+            if (presentation.toy != null)
               Positioned(
-                left: widget.controller.bouncingToy!.position.dx - 16,
-                top: widget.controller.bouncingToy!.position.dy - 16,
+                left: presentation.toy!.position.dx - 16,
+                top: presentation.toy!.position.dy - 16,
                 child: Transform.rotate(
-                  angle: widget.controller.bouncingToy!.rotation,
+                  angle: presentation.toy!.rotation,
                   child: Text(
-                    widget.controller.bouncingToy!.emoji,
+                    presentation.toy!.emoji,
                     style: const TextStyle(fontSize: 28),
                   ),
                 ),
@@ -142,23 +143,21 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
 
             // 5. Render Pixel Pet
             Positioned(
-              left: widget.controller.position.dx,
-              top: widget.controller.position.dy,
+              left: presentation.position.dx,
+              top: presentation.position.dy,
               child: PixelPet(
-                petType: widget.controller.selectedPet,
-                state: widget.controller.state,
-                direction: widget.controller.direction,
-                frameIndex: widget.controller.frameIndex,
+                petType: presentation.petType,
+                state: presentation.petState,
+                direction: presentation.direction,
+                frameIndex: presentation.frameIndex,
               ),
             ),
 
             // 6. Render floating particles (hearts, notes, feathers above pet)
-            for (final particle in widget.controller.particles.where(
-              (p) => p.kind != ParticleKind.dust,
-            ))
+            for (final particle in presentation.signatureParticles)
               Positioned(
-                left: particle.position.dx - particle.currentSize / 2,
-                top: particle.position.dy - particle.currentSize / 2,
+                left: particle.position.dx - particle.size / 2,
+                top: particle.position.dy - particle.size / 2,
                 child: Opacity(
                   opacity: particle.opacity,
                   child: _buildParticleWidget(particle),
@@ -166,14 +165,10 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
               ),
 
             // 7. Status reaction badge (pounce! / watching)
-            if (widget.controller.state == PetState.pounce ||
-                widget.controller.state == PetState.observe ||
-                widget.controller.state == PetState.pawTest ||
-                widget.controller.state == PetState.dogProbe ||
-                widget.controller.state == PetState.parrotProbe)
+            if (presentation.showActionBadge)
               Positioned(
-                left: widget.controller.position.dx,
-                top: (widget.controller.position.dy - 26).clamp(4, 1000),
+                left: presentation.position.dx,
+                top: (presentation.position.dy - 26).clamp(4, 1000),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: const Color(0xff24243a),
@@ -185,13 +180,12 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
                       vertical: 4,
                     ),
                     child: Text(
-                      switch (widget.controller.state) {
-                        PetState.pounce =>
-                          widget.controller.petConfig.pounceLabel,
+                      switch (presentation.petState) {
+                        PetState.pounce => config.pounceLabel,
                         PetState.pawTest => 'tap tap',
                         PetState.dogProbe => 'sniff',
                         PetState.parrotProbe => 'inspect',
-                        _ => widget.controller.petConfig.observeLabel,
+                        _ => config.observeLabel,
                       },
                       style: const TextStyle(
                         color: Colors.white,
@@ -208,7 +202,7 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
     );
   }
 
-  Widget _buildParticleWidget(PetParticle particle) {
+  Widget _buildParticleWidget(PetParticleSnapshot particle) {
     switch (particle.kind) {
       case ParticleKind.heart:
         return const Text('❤️', style: TextStyle(fontSize: 16));
