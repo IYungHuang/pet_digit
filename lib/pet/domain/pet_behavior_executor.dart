@@ -1,3 +1,4 @@
+import 'pet_action_plan.dart';
 import 'pet_behavior_catalog.dart';
 import 'pet_behavior_runtime.dart';
 import 'pet_message_target.dart';
@@ -40,7 +41,7 @@ class PetBehaviorExecutor {
       case PetBehaviorAction.nosePawBump:
         if (selection.stimulusType == PetStimulusType.userTap &&
             target.kind == WorldObjectKind.platform) {
-          _runtime.startJumpToPlatform(target);
+          _start(selection, target, PetRuntimeAction.jumpToPlatform);
           return _executed(selection, target, 'platform jump');
         }
         return _observeFallback(
@@ -51,32 +52,47 @@ class PetBehaviorExecutor {
       case PetBehaviorAction.headBuntRub:
       case PetBehaviorAction.beakTouch:
         if (target.kind == WorldObjectKind.platform) {
-          _runtime.startJumpToPlatform(target);
+          _start(selection, target, PetRuntimeAction.jumpToPlatform);
           return _fallback(selection, target, 'platform jump fallback');
         }
         return _observeFallback(selection, target, 'platform target required');
       case PetBehaviorAction.runChase:
       case PetBehaviorAction.pounce:
         if (target.kind == WorldObjectKind.emojiToy) {
-          _runtime.startChaseEmoji(target, payload: target.payload);
+          _start(
+            selection,
+            target,
+            PetRuntimeAction.chaseEmoji,
+            payload: target.payload,
+          );
           return _executed(selection, target, 'emoji chase');
         }
         return _observeFallback(selection, target, 'emoji target required');
       case PetBehaviorAction.flyFlap:
         if (target.kind == WorldObjectKind.emojiToy) {
-          _runtime.startChaseEmoji(target, payload: target.payload);
+          _start(
+            selection,
+            target,
+            PetRuntimeAction.chaseEmoji,
+            payload: target.payload,
+          );
           return _fallback(selection, target, 'emoji chase fallback');
         }
         return _observeFallback(selection, target, 'emoji target required');
       case PetBehaviorAction.sniffBubble:
         if (target.kind == WorldObjectKind.animatedToy) {
-          _runtime.startInspectGif(target, payload: target.payload);
+          _start(
+            selection,
+            target,
+            PetRuntimeAction.inspectMedia,
+            payload: target.payload,
+          );
           return _fallback(selection, target, 'observe fallback');
         }
         return _observeFallback(selection, target, 'media target required');
       case PetBehaviorAction.novelObjectNoseProbe:
         if (target.kind == WorldObjectKind.animatedToy) {
-          _runtime.startDogProbe(target);
+          _start(selection, target, PetRuntimeAction.dogProbe);
           return _executed(selection, target, 'native dog media probe');
         }
         return _observeFallback(selection, target, 'media target required');
@@ -84,22 +100,37 @@ class PetBehaviorExecutor {
       case PetBehaviorAction.sniffWhiskerScan:
       case PetBehaviorAction.headTiltEyeFocus:
         if (target.kind == WorldObjectKind.animatedToy) {
-          _runtime.startInspectGif(target, payload: target.payload);
+          _start(
+            selection,
+            target,
+            PetRuntimeAction.inspectMedia,
+            payload: target.payload,
+          );
           return _fallback(selection, target, 'observe fallback');
         }
         return _observeFallback(selection, target, 'observe fallback');
       case PetBehaviorAction.circleSniff:
-        _runtime.startObserveTarget(target, walkToward: true);
+        _start(
+          selection,
+          target,
+          PetRuntimeAction.observeTarget,
+          walkToward: true,
+        );
         return _fallback(selection, target, 'walk-toward observe fallback');
       case PetBehaviorAction.pawTest:
         if (target.kind == WorldObjectKind.animatedToy) {
-          _runtime.startPawTest(target);
+          _start(selection, target, PetRuntimeAction.catPawTest);
           return _executed(selection, target, 'native paw test');
         }
         return _observeFallback(selection, target, 'media target required');
       case PetBehaviorAction.batPounce:
         if (target.kind == WorldObjectKind.emojiToy) {
-          _runtime.startChaseEmoji(target, payload: target.payload);
+          _start(
+            selection,
+            target,
+            PetRuntimeAction.chaseEmoji,
+            payload: target.payload,
+          );
           return _fallback(selection, target, 'emoji chase fallback');
         }
         return _observeFallback(selection, target, 'emoji target required');
@@ -112,7 +143,7 @@ class PetBehaviorExecutor {
         );
       case PetBehaviorAction.beakProbe:
         if (target.kind == WorldObjectKind.animatedToy) {
-          _runtime.startParrotProbe(target);
+          _start(selection, target, PetRuntimeAction.parrotProbe);
           return _executed(selection, target, 'native parrot media probe');
         }
         return _observeFallback(selection, target, 'media target required');
@@ -126,7 +157,12 @@ class PetBehaviorExecutor {
       case PetBehaviorAction.approachStopStart:
       case PetBehaviorAction.approachLowSilent:
       case PetBehaviorAction.approachSideways:
-        _runtime.startObserveTarget(target, walkToward: true);
+        _start(
+          selection,
+          target,
+          PetRuntimeAction.observeTarget,
+          walkToward: true,
+        );
         return _fallback(selection, target, 'light approach fallback');
       default:
         return _ignored(
@@ -142,8 +178,27 @@ class PetBehaviorExecutor {
     PetMessageTarget target,
     String reason,
   ) {
-    _runtime.startObserveTarget(target, walkToward: false);
+    _start(selection, target, PetRuntimeAction.observeTarget);
     return _fallback(selection, target, reason);
+  }
+
+  void _start(
+    PetBehaviorSelection selection,
+    PetMessageTarget target,
+    PetRuntimeAction runtimeAction, {
+    Object? payload,
+    bool walkToward = false,
+  }) {
+    _runtime.startAction(
+      PetActionPlan(
+        runtimeAction: runtimeAction,
+        catalogAction: selection.action,
+        originTargetId: target.id,
+        payload: payload,
+        walkToward: walkToward,
+      ),
+      target,
+    );
   }
 
   PetBehaviorExecutionResult _executed(

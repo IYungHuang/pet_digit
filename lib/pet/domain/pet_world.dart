@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import '../../chat/domain/chat_models.dart';
+import 'pet_action_plan.dart';
 
 enum PetType { corgi, cat, parrot }
 
@@ -109,19 +110,7 @@ abstract interface class PetBoundedInteractable implements PetInteractable {
 /// Controller remains owner of animation state and effects. Executor only
 /// selects an explicit compatible runtime sequence.
 abstract interface class PetBehaviorRuntime {
-  void startJumpToPlatform(PetBoundedInteractable target);
-
-  void startChaseEmoji(PetInteractable target, {required Object? payload});
-
-  void startInspectGif(PetInteractable target, {required Object? payload});
-
-  void startPawTest(PetInteractable target);
-
-  void startDogProbe(PetInteractable target);
-
-  void startParrotProbe(PetInteractable target);
-
-  void startObserveTarget(PetInteractable target, {required bool walkToward});
+  void startAction(PetActionPlan plan, PetInteractable target);
 }
 
 class MessageWorldObject implements PetBoundedInteractable {

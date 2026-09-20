@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../chat/domain/chat_models.dart';
 import '../../chat/domain/chat_message.dart' as domain;
+import 'pet_action_plan.dart';
 import 'pet_behavior_catalog.dart';
 import 'pet_behavior_executor.dart';
 import 'pet_behavior_normalizer.dart';
@@ -564,6 +565,58 @@ class PetWorldController implements PetBehaviorRuntime {
     return liveTarget;
   }
 
+  @override
+  void startAction(PetActionPlan plan, PetInteractable target) {
+    _startPlannedAction(plan, target);
+  }
+
+  void _startPlannedAction(PetActionPlan plan, PetInteractable target) {
+    final platformImpulse = plan.runtimeAction == PetRuntimeAction.chaseEmoji
+        ? 70.0
+        : 60.0;
+    final liveTarget = _beginRuntimeAction(
+      target,
+      plan.payload,
+      platformImpulse: platformImpulse,
+    );
+
+    switch (plan.runtimeAction) {
+      case PetRuntimeAction.jumpToPlatform:
+        final boundedTarget = liveTarget is PetBoundedInteractable
+            ? liveTarget
+            : target is PetBoundedInteractable
+            ? target
+            : null;
+        if (boundedTarget == null) {
+          throw ArgumentError.value(
+            target,
+            'target',
+            'jumpToPlatform requires a bounded target',
+          );
+        }
+        _startJumpToPlatform(boundedTarget);
+        return;
+      case PetRuntimeAction.chaseEmoji:
+        _startChaseEmoji(liveTarget, payload: plan.payload);
+        return;
+      case PetRuntimeAction.inspectMedia:
+        _startInspectGif(liveTarget);
+        return;
+      case PetRuntimeAction.observeTarget:
+        _startObserveTarget(liveTarget, walkToward: plan.walkToward);
+        return;
+      case PetRuntimeAction.catPawTest:
+        _startPawTest(liveTarget);
+        return;
+      case PetRuntimeAction.dogProbe:
+        _startDogProbe(liveTarget);
+        return;
+      case PetRuntimeAction.parrotProbe:
+        _startParrotProbe(liveTarget);
+        return;
+    }
+  }
+
   void _cancelActiveRuntimeArtifacts({required double platformImpulse}) {
     if (currentPlatform != null) {
       triggerBubbleImpulse(currentPlatform!.id, platformImpulse);
@@ -574,11 +627,14 @@ class PetWorldController implements PetBehaviorRuntime {
   }
 
   // --- Platform Jump (Standing/Walking on Bubble with Spring Landing) ---
-  @override
   void startJumpToPlatform(PetBoundedInteractable target) {
-    final liveTarget = _beginRuntimeAction(target, null, platformImpulse: 60.0);
-    _startJumpToPlatform(
-      liveTarget is PetBoundedInteractable ? liveTarget : target,
+    _startPlannedAction(
+      PetActionPlan(
+        runtimeAction: PetRuntimeAction.jumpToPlatform,
+        catalogAction: PetBehaviorAction.nosePawBump,
+        originTargetId: target.id,
+      ),
+      target,
     );
   }
 
@@ -641,14 +697,16 @@ class PetWorldController implements PetBehaviorRuntime {
   }
 
   // --- Emoji Chase (Video 2: Emoji Bouncing & Corgi Chasing) ---
-  @override
   void startChaseEmoji(PetInteractable target, {required Object? payload}) {
-    final liveTarget = _beginRuntimeAction(
+    _startPlannedAction(
+      PetActionPlan(
+        runtimeAction: PetRuntimeAction.chaseEmoji,
+        catalogAction: PetBehaviorAction.runChase,
+        originTargetId: target.id,
+        payload: payload,
+      ),
       target,
-      payload,
-      platformImpulse: 70.0,
     );
-    _startChaseEmoji(liveTarget, payload: payload);
   }
 
   void _startChaseEmoji(PetInteractable target, {required Object? payload}) {
@@ -717,14 +775,16 @@ class PetWorldController implements PetBehaviorRuntime {
   }
 
   // --- GIF Observe (Video 1: Look up -> Hearts -> Approach -> Paw on Bubble) ---
-  @override
   void startInspectGif(PetInteractable target, {required Object? payload}) {
-    final liveTarget = _beginRuntimeAction(
+    _startPlannedAction(
+      PetActionPlan(
+        runtimeAction: PetRuntimeAction.inspectMedia,
+        catalogAction: PetBehaviorAction.sniffBubble,
+        originTargetId: target.id,
+        payload: payload,
+      ),
       target,
-      payload,
-      platformImpulse: 60.0,
     );
-    _startInspectGif(liveTarget);
   }
 
   void _startInspectGif(PetInteractable target) {
@@ -788,9 +848,18 @@ class PetWorldController implements PetBehaviorRuntime {
     }
   }
 
-  @override
   void startPawTest(PetInteractable target) {
-    final liveTarget = _beginRuntimeAction(target, null, platformImpulse: 60.0);
+    _startPlannedAction(
+      PetActionPlan(
+        runtimeAction: PetRuntimeAction.catPawTest,
+        catalogAction: PetBehaviorAction.pawTest,
+        originTargetId: target.id,
+      ),
+      target,
+    );
+  }
+
+  void _startPawTest(PetInteractable liveTarget) {
     _pawTestStart = position;
     _pawTestUsesRightSide = _usesRightSideOf(liveTarget.bounds);
     _pawTestTarget = _messageSidePosition(
@@ -905,9 +974,18 @@ class PetWorldController implements PetBehaviorRuntime {
     return Offset(x.clamp(0.0, maxX), y.clamp(0.0, maxY));
   }
 
-  @override
   void startDogProbe(PetInteractable target) {
-    final liveTarget = _beginRuntimeAction(target, null, platformImpulse: 60.0);
+    _startPlannedAction(
+      PetActionPlan(
+        runtimeAction: PetRuntimeAction.dogProbe,
+        catalogAction: PetBehaviorAction.novelObjectNoseProbe,
+        originTargetId: target.id,
+      ),
+      target,
+    );
+  }
+
+  void _startDogProbe(PetInteractable liveTarget) {
     _startSpeciesProbe(liveTarget);
     currentAction = PetActionType.dogProbe;
     state = PetState.dogProbe;
@@ -952,9 +1030,18 @@ class PetWorldController implements PetBehaviorRuntime {
     }
   }
 
-  @override
   void startParrotProbe(PetInteractable target) {
-    final liveTarget = _beginRuntimeAction(target, null, platformImpulse: 60.0);
+    _startPlannedAction(
+      PetActionPlan(
+        runtimeAction: PetRuntimeAction.parrotProbe,
+        catalogAction: PetBehaviorAction.beakProbe,
+        originTargetId: target.id,
+      ),
+      target,
+    );
+  }
+
+  void _startParrotProbe(PetInteractable liveTarget) {
     _startSpeciesProbe(liveTarget);
     currentAction = PetActionType.parrotProbe;
     state = PetState.parrotProbe;
@@ -1015,9 +1102,19 @@ class PetWorldController implements PetBehaviorRuntime {
     return t * t * (3 - 2 * t);
   }
 
-  @override
   void startObserveTarget(PetInteractable target, {required bool walkToward}) {
-    _beginRuntimeAction(target, null, platformImpulse: 60.0);
+    _startPlannedAction(
+      PetActionPlan(
+        runtimeAction: PetRuntimeAction.observeTarget,
+        catalogAction: PetBehaviorAction.headTiltFocus,
+        originTargetId: target.id,
+        walkToward: walkToward,
+      ),
+      target,
+    );
+  }
+
+  void _startObserveTarget(PetInteractable target, {required bool walkToward}) {
     currentAction = PetActionType.observeTarget;
     _walkTowardObservationTarget = walkToward;
     state = walkToward ? PetState.walk : PetState.observe;
