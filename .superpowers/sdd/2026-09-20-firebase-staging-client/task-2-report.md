@@ -16,10 +16,12 @@ Implemented explicit fake, emulator, and staging Firebase environment modes with
 
 - RED: `flutter test test/firebase_environment_test.dart` failed to compile because staging APIs and mode were missing.
 - GREEN: implementation made the new tests pass.
+- Fix round 1 RED: staging initialization reached `Firebase.initializeApp` and failed through Flutter binding instead of failing closed.
+- Fix round 1 GREEN: staging initialization now throws its clear `StateError` before Firebase initialization or emulator wiring.
 
 ## Verification
 
-- `flutter test test/firebase_environment_test.dart test/firebase_emulator_integration_test.dart` — 5 tests passed.
+- `flutter test test/firebase_environment_test.dart test/firebase_emulator_integration_test.dart` — 6 tests passed.
 - `flutter analyze lib/firebase/firebase_environment.dart lib/chat/presentation/chat_providers.dart test/firebase_environment_test.dart test/firebase_emulator_integration_test.dart integration_test/firebase_emulator_test.dart` — no issues.
 - `rg -n "us-central1|productionPlaceholder" lib test integration_test` — no matches.
 - `git diff --check` — passed.
@@ -27,6 +29,7 @@ Implemented explicit fake, emulator, and staging Firebase environment modes with
 ## Self-review
 
 - Reviewed diff against every Task 2 step: public environment API, provider composition, shared-region consumers, test coverage, and literal removal all match the brief.
+- Fix round 1: verified staging guard precedes all Firebase access; emulator mode remains the only mode that initializes demo options and emulator hosts.
 
 ## Concerns
 

@@ -25,6 +25,19 @@ void main() {
     );
   });
 
+  test('staging fails closed before Firebase initialization is configured', () {
+    expect(
+      FirebaseEnvironment.staging().initialize(),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('Staging Firebase configuration is not available'),
+        ),
+      ),
+    );
+  });
+
   test('reads emulator ports from backend firebase.json shape', () {
     final environment = FirebaseEnvironment.fromBackendFirebaseJson(
       jsonDecode('''

@@ -72,6 +72,9 @@ class FirebaseEnvironment {
 
   Future<void> initialize() async {
     if (mode == FirebaseEnvironmentMode.fake) return;
+    if (mode == FirebaseEnvironmentMode.staging) {
+      throw StateError('Staging Firebase configuration is not available');
+    }
 
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
