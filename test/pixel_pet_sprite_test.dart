@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_world.dart';
 import 'package:chat_pet_mvp/pet/presentation/pixel_pet.dart';
@@ -252,6 +253,58 @@ void main() {
           expect(tester.takeException(), isNull);
         }
       }
+    });
+
+    testWidgets('PixelPet uses catalog size unless explicit size is supplied', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: PixelPet(state: PetState.idle),
+        ),
+      );
+
+      var box = tester.widget<SizedBox>(
+        find.descendant(
+          of: find.byType(PixelPetSprite),
+          matching: find.byType(SizedBox),
+        ),
+      );
+      expect(box.width, 64);
+      expect(box.height, 64);
+
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: PixelPet(state: PetState.idle, size: Size(64, 64)),
+        ),
+      );
+
+      box = tester.widget<SizedBox>(
+        find.descendant(
+          of: find.byType(PixelPetSprite),
+          matching: find.byType(SizedBox),
+        ),
+      );
+      expect(box.width, 64);
+      expect(box.height, 64);
+
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: PixelPet(state: PetState.walk, size: Size(91, 47)),
+        ),
+      );
+
+      box = tester.widget<SizedBox>(
+        find.descendant(
+          of: find.byType(PixelPetSprite),
+          matching: find.byType(SizedBox),
+        ),
+      );
+      expect(box.width, 91);
+      expect(box.height, 47);
     });
   });
 }

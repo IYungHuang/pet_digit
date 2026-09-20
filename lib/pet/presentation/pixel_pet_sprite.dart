@@ -1,50 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../domain/pet_world.dart';
+import 'pet_animation_catalog.dart';
 
 /// Helper to map [PetType], [PetState] and frame index to the corresponding asset file.
 String petAssetFor(PetType petType, PetState state, int frameIndex) {
-  final prefix = petType.name;
-  switch (state) {
-    case PetState.idle:
-      final idx = frameIndex.abs() % 4;
-      return 'assets/pets/${prefix}_idle_$idx.png';
-    case PetState.walk:
-      final idx = frameIndex.abs() % 4;
-      return 'assets/pets/${prefix}_walk_$idx.png';
-    case PetState.run:
-      final idx = frameIndex.abs() % 2;
-      return 'assets/pets/${prefix}_run_$idx.png';
-    case PetState.jump:
-    case PetState.pounce:
-      final idx = frameIndex.abs() % 2;
-      return 'assets/pets/${prefix}_jump_$idx.png';
-    case PetState.observe:
-      final idx = frameIndex.abs() % 2;
-      return 'assets/pets/${prefix}_observe_$idx.png';
-    case PetState.catStalk:
-      final idx = frameIndex.abs() % 4;
-      return petType == PetType.cat
-          ? 'assets/pets/cat_stalk_$idx.png'
-          : 'assets/pets/${prefix}_walk_$idx.png';
-    case PetState.pawTest:
-      if (petType == PetType.cat) {
-        final idx = frameIndex.abs() % 6;
-        return 'assets/pets/cat_paw_test_$idx.png';
-      }
-      final idx = frameIndex.abs() % 2;
-      return 'assets/pets/${prefix}_observe_$idx.png';
-    case PetState.dogProbe:
-      final idx = frameIndex.abs() % 6;
-      return petType == PetType.corgi
-          ? 'assets/pets/corgi_novel_probe_$idx.png'
-          : 'assets/pets/${prefix}_observe_${idx % 2}.png';
-    case PetState.parrotProbe:
-      final idx = frameIndex.abs() % 6;
-      return petType == PetType.parrot
-          ? 'assets/pets/parrot_novel_probe_$idx.png'
-          : 'assets/pets/${prefix}_observe_${idx % 2}.png';
-  }
+  return PetAnimationCatalog.resolve(petType, state).frameAt(frameIndex);
 }
 
 /// Helper to map [PetState] and frame index to the corresponding corgi asset file (backward compatible).
@@ -113,29 +74,31 @@ class PixelPetSprite extends StatelessWidget {
     required this.state,
     this.direction = 1.0,
     this.frameIndex = 0,
-    this.size = const Size(64, 64),
+    this.size,
   });
 
   final PetType petType;
   final PetState state;
   final double direction;
   final int frameIndex;
-  final Size size;
+  final Size? size;
 
   @override
   Widget build(BuildContext context) {
-    final assetPath = petAssetFor(petType, state, frameIndex);
+    final spec = PetAnimationCatalog.resolve(petType, state);
+    final resolvedSize = size ?? spec.logicalSize;
+    final assetPath = spec.frameAt(frameIndex);
     final isFacingLeft = direction < 0;
 
     return SizedBox(
-      width: size.width,
-      height: size.height,
+      width: resolvedSize.width,
+      height: resolvedSize.height,
       child: Transform.flip(
         flipX: isFacingLeft,
         child: Image.asset(
           assetPath,
-          width: size.width,
-          height: size.height,
+          width: resolvedSize.width,
+          height: resolvedSize.height,
           fit: BoxFit.contain,
           filterQuality: FilterQuality.none,
           isAntiAlias: false,
