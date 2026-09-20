@@ -1,5 +1,7 @@
-import 'dart:ui';
+import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_world.dart';
 import 'package:chat_pet_mvp/pet/presentation/pixel_pet.dart';
@@ -7,6 +9,55 @@ import 'package:chat_pet_mvp/pet/presentation/pixel_pet_sprite.dart';
 
 void main() {
   group('PixelPetSprite domain & assets', () {
+    testWidgets('corgi walk frames are valid and visibly distinct', (
+      tester,
+    ) async {
+      final visibleFrames = <Uint8List>[];
+
+      for (var frame = 0; frame < 4; frame++) {
+        final asset = await rootBundle.load(
+          'assets/pets/corgi_walk_$frame.png',
+        );
+        final codec = (await tester.runAsync(
+          () => ui.instantiateImageCodec(
+            asset.buffer.asUint8List(asset.offsetInBytes, asset.lengthInBytes),
+          ),
+        ))!;
+        final decoded = (await tester.runAsync(codec.getNextFrame))!;
+        final image = decoded.image;
+        addTearDown(image.dispose);
+        addTearDown(codec.dispose);
+
+        expect(image.width, 128, reason: 'walk frame $frame width');
+        expect(image.height, 128, reason: 'walk frame $frame height');
+
+        final rgbaData = await tester.runAsync(
+          () => image.toByteData(format: ui.ImageByteFormat.rawStraightRgba),
+        );
+        expect(rgbaData, isNotNull);
+        final rgba = rgbaData!.buffer.asUint8List(
+          rgbaData.offsetInBytes,
+          rgbaData.lengthInBytes,
+        );
+        final alpha = <int>[
+          for (var index = 3; index < rgba.length; index += 4) rgba[index],
+        ];
+        expect(alpha.any((value) => value == 0), isTrue);
+        expect(alpha.any((value) => value > 0), isTrue);
+        visibleFrames.add(Uint8List.fromList(rgba));
+      }
+
+      for (var left = 0; left < visibleFrames.length; left++) {
+        for (var right = left + 1; right < visibleFrames.length; right++) {
+          expect(
+            listEquals(visibleFrames[left], visibleFrames[right]),
+            isFalse,
+            reason: 'walk frames $left and $right must differ visibly',
+          );
+        }
+      }
+    });
+
     test('corgiAssetFor maps all PetStates and frames properly', () {
       expect(corgiAssetFor(PetState.idle, 0), 'assets/pets/corgi_idle_0.png');
       expect(corgiAssetFor(PetState.idle, 3), 'assets/pets/corgi_idle_3.png');
@@ -116,19 +167,19 @@ void main() {
 
     test('CorgiSpriteSheet returns valid frame Rects', () {
       final idleRect = CorgiSpriteSheet.getFrameRect(PetState.idle, 1);
-      expect(idleRect, const Rect.fromLTWH(128, 0, 128, 128));
+      expect(idleRect, const ui.Rect.fromLTWH(128, 0, 128, 128));
 
       final walkRect = CorgiSpriteSheet.getFrameRect(PetState.walk, 2);
-      expect(walkRect, const Rect.fromLTWH(256, 128, 128, 128));
+      expect(walkRect, const ui.Rect.fromLTWH(256, 128, 128, 128));
 
       final runRect = CorgiSpriteSheet.getFrameRect(PetState.run, 0);
-      expect(runRect, const Rect.fromLTWH(0, 256, 128, 128));
+      expect(runRect, const ui.Rect.fromLTWH(0, 256, 128, 128));
 
       final jumpRect = CorgiSpriteSheet.getFrameRect(PetState.jump, 1);
-      expect(jumpRect, const Rect.fromLTWH(256, 384, 128, 128));
+      expect(jumpRect, const ui.Rect.fromLTWH(256, 384, 128, 128));
 
       final observeRect = CorgiSpriteSheet.getFrameRect(PetState.observe, 0);
-      expect(observeRect, const Rect.fromLTWH(0, 512, 128, 128));
+      expect(observeRect, const ui.Rect.fromLTWH(0, 512, 128, 128));
     });
 
     testWidgets('PixelPet renders without error across states and pet types', (
