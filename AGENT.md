@@ -27,6 +27,13 @@ when ideating, designing, or implementing pet-message bubble interactions,
 physical/emotional reactions, lifecycle animations, gamification, or Flutter
 overlay architecture.
 
+Read [寵物動作新增指南](docs/pet-action-authoring-guide.md) before adding or
+changing pet behavior catalog entries, triggers, action plans, runtime actions,
+timeline handlers, lifecycle/retargeting behavior, animation mappings, sprite
+assets, or pet presentation state. Follow its tests and completion checklist;
+do not add action timelines back to `PetWorldController` or introduce a
+parallel runtime.
+
 Before commit, follow [Git Commit Gate](docs/git-commit-gate.md): peer review
 first, then run the automated gate. Repository hook lives at `.githooks`.
 
