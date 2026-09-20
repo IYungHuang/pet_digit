@@ -167,6 +167,7 @@ void main() {
 
         expect(result.status, expectation.status);
         expect(result.action, action);
+        expect(result.reason, expectation.reason);
         if (expectation.runtimeAction == null) {
           expect(runtime.calls, isEmpty);
         } else {
@@ -175,9 +176,46 @@ void main() {
           expect(runtime.calls.single.catalogAction, action);
           expect(runtime.calls.single.originTargetId, target.id);
           expect(runtime.calls.single.walkToward, expectation.walkToward);
+          expect(
+            runtime.calls.single.payload,
+            expectation.carriesPayload ? same(target.payload) : isNull,
+          );
         }
       });
     }
+
+    test('invalid jump target throws before mutating active runtime', () {
+      final controller = PetWorldController();
+      final chaseTarget = _target(
+        kind: WorldObjectKind.emojiToy,
+        contentKind: PetNormalizedContentKind.emoji,
+        payload: '🎾',
+      );
+      controller.startChaseEmoji(chaseTarget, payload: chaseTarget.payload);
+      final actionBefore = controller.currentAction;
+      final stateBefore = controller.state;
+      final targetBefore = controller.activeTarget;
+      final payloadBefore = controller.activePayload;
+      final toyBefore = controller.bouncingToy;
+
+      expect(
+        () => controller.startAction(
+          const PetActionPlan(
+            runtimeAction: PetRuntimeAction.jumpToPlatform,
+            catalogAction: PetBehaviorAction.nosePawBump,
+            originTargetId: 'invalid',
+          ),
+          const _UnboundedTarget(),
+        ),
+        throwsArgumentError,
+      );
+
+      expect(controller.currentAction, actionBefore);
+      expect(controller.state, stateBefore);
+      expect(controller.activeTarget, same(targetBefore));
+      expect(controller.activePayload, same(payloadBefore));
+      expect(controller.bouncingToy, same(toyBefore));
+    });
 
     test('unsupported capability can still use explicit fallback plan', () {
       final runtime = _RecordingRuntime();
@@ -589,6 +627,25 @@ class _RecordingRuntime implements PetBehaviorRuntime {
   }
 }
 
+class _UnboundedTarget implements PetInteractable {
+  const _UnboundedTarget();
+
+  @override
+  Rect get bounds => const Rect.fromLTWH(0, 0, 10, 10);
+
+  @override
+  String get id => 'invalid';
+
+  @override
+  WorldObjectKind get kind => WorldObjectKind.platform;
+
+  @override
+  Offset get position => Offset.zero;
+
+  @override
+  PetState interactionFor(PetEvent event) => PetState.jump;
+}
+
 PetNormalizedContentKind _contentKindFor(WorldObjectKind kind) =>
     switch (kind) {
       WorldObjectKind.platform => PetNormalizedContentKind.text,
@@ -602,6 +659,8 @@ PetNormalizedContentKind _contentKindFor(WorldObjectKind kind) =>
   PetRuntimeAction? runtimeAction,
   PetBehaviorExecutionStatus status,
   bool walkToward,
+  bool carriesPayload,
+  String reason,
 })
 _expectationFor(PetBehaviorAction action) => switch (action) {
   PetBehaviorAction.nosePawBump => (
@@ -610,6 +669,8 @@ _expectationFor(PetBehaviorAction action) => switch (action) {
     runtimeAction: PetRuntimeAction.jumpToPlatform,
     status: PetBehaviorExecutionStatus.executed,
     walkToward: false,
+    carriesPayload: false,
+    reason: 'platform jump',
   ),
   PetBehaviorAction.headBuntRub || PetBehaviorAction.beakTouch => (
     targetKind: WorldObjectKind.platform,
@@ -617,6 +678,8 @@ _expectationFor(PetBehaviorAction action) => switch (action) {
     runtimeAction: PetRuntimeAction.jumpToPlatform,
     status: PetBehaviorExecutionStatus.fallback,
     walkToward: false,
+    carriesPayload: false,
+    reason: 'platform jump fallback',
   ),
   PetBehaviorAction.runChase || PetBehaviorAction.pounce => (
     targetKind: WorldObjectKind.emojiToy,
@@ -624,6 +687,8 @@ _expectationFor(PetBehaviorAction action) => switch (action) {
     runtimeAction: PetRuntimeAction.chaseEmoji,
     status: PetBehaviorExecutionStatus.executed,
     walkToward: false,
+    carriesPayload: true,
+    reason: 'emoji chase',
   ),
   PetBehaviorAction.flyFlap || PetBehaviorAction.batPounce => (
     targetKind: WorldObjectKind.emojiToy,
@@ -631,8 +696,18 @@ _expectationFor(PetBehaviorAction action) => switch (action) {
     runtimeAction: PetRuntimeAction.chaseEmoji,
     status: PetBehaviorExecutionStatus.fallback,
     walkToward: false,
+    carriesPayload: true,
+    reason: 'emoji chase fallback',
   ),
-  PetBehaviorAction.sniffBubble ||
+  PetBehaviorAction.sniffBubble => (
+    targetKind: WorldObjectKind.animatedToy,
+    stimulus: PetStimulusType.gif,
+    runtimeAction: PetRuntimeAction.inspectMedia,
+    status: PetBehaviorExecutionStatus.fallback,
+    walkToward: false,
+    carriesPayload: true,
+    reason: 'observe fallback',
+  ),
   PetBehaviorAction.headTiltFocus ||
   PetBehaviorAction.sniffWhiskerScan ||
   PetBehaviorAction.headTiltEyeFocus => (
@@ -641,6 +716,8 @@ _expectationFor(PetBehaviorAction action) => switch (action) {
     runtimeAction: PetRuntimeAction.inspectMedia,
     status: PetBehaviorExecutionStatus.fallback,
     walkToward: false,
+    carriesPayload: true,
+    reason: 'observe fallback',
   ),
   PetBehaviorAction.novelObjectNoseProbe => (
     targetKind: WorldObjectKind.animatedToy,
@@ -648,6 +725,8 @@ _expectationFor(PetBehaviorAction action) => switch (action) {
     runtimeAction: PetRuntimeAction.dogProbe,
     status: PetBehaviorExecutionStatus.executed,
     walkToward: false,
+    carriesPayload: false,
+    reason: 'native dog media probe',
   ),
   PetBehaviorAction.pawTest => (
     targetKind: WorldObjectKind.animatedToy,
@@ -655,6 +734,8 @@ _expectationFor(PetBehaviorAction action) => switch (action) {
     runtimeAction: PetRuntimeAction.catPawTest,
     status: PetBehaviorExecutionStatus.executed,
     walkToward: false,
+    carriesPayload: false,
+    reason: 'native paw test',
   ),
   PetBehaviorAction.beakProbe => (
     targetKind: WorldObjectKind.animatedToy,
@@ -662,8 +743,18 @@ _expectationFor(PetBehaviorAction action) => switch (action) {
     runtimeAction: PetRuntimeAction.parrotProbe,
     status: PetBehaviorExecutionStatus.executed,
     walkToward: false,
+    carriesPayload: false,
+    reason: 'native parrot media probe',
   ),
-  PetBehaviorAction.circleSniff ||
+  PetBehaviorAction.circleSniff => (
+    targetKind: WorldObjectKind.platform,
+    stimulus: PetStimulusType.newMessageBubble,
+    runtimeAction: PetRuntimeAction.observeTarget,
+    status: PetBehaviorExecutionStatus.fallback,
+    walkToward: true,
+    carriesPayload: false,
+    reason: 'walk-toward observe fallback',
+  ),
   PetBehaviorAction.approachArc ||
   PetBehaviorAction.approachStopStart ||
   PetBehaviorAction.approachLowSilent ||
@@ -673,6 +764,8 @@ _expectationFor(PetBehaviorAction action) => switch (action) {
     runtimeAction: PetRuntimeAction.observeTarget,
     status: PetBehaviorExecutionStatus.fallback,
     walkToward: true,
+    carriesPayload: false,
+    reason: 'light approach fallback',
   ),
   PetBehaviorAction.hidePeek || PetBehaviorAction.beakManipulate => (
     targetKind: WorldObjectKind.platform,
@@ -680,6 +773,17 @@ _expectationFor(PetBehaviorAction action) => switch (action) {
     runtimeAction: PetRuntimeAction.observeTarget,
     status: PetBehaviorExecutionStatus.fallback,
     walkToward: false,
+    carriesPayload: false,
+    reason: 'observe fallback; no equivalent runtime',
+  ),
+  PetBehaviorAction.flyBack => (
+    targetKind: WorldObjectKind.platform,
+    stimulus: PetStimulusType.userTap,
+    runtimeAction: null,
+    status: PetBehaviorExecutionStatus.ignored,
+    walkToward: false,
+    carriesPayload: false,
+    reason: 'flyBack has no safe runtime mapping',
   ),
   _ => (
     targetKind: WorldObjectKind.platform,
@@ -687,6 +791,8 @@ _expectationFor(PetBehaviorAction action) => switch (action) {
     runtimeAction: null,
     status: PetBehaviorExecutionStatus.ignored,
     walkToward: false,
+    carriesPayload: false,
+    reason: 'unsupported action ${action.name}',
   ),
 };
 

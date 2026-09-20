@@ -571,6 +571,7 @@ class PetWorldController implements PetBehaviorRuntime {
   }
 
   void _startPlannedAction(PetActionPlan plan, PetInteractable target) {
+    _validateActionTarget(plan, target);
     final platformImpulse = plan.runtimeAction == PetRuntimeAction.chaseEmoji
         ? 70.0
         : 60.0;
@@ -587,14 +588,8 @@ class PetWorldController implements PetBehaviorRuntime {
             : target is PetBoundedInteractable
             ? target
             : null;
-        if (boundedTarget == null) {
-          throw ArgumentError.value(
-            target,
-            'target',
-            'jumpToPlatform requires a bounded target',
-          );
-        }
-        _startJumpToPlatform(boundedTarget);
+        assert(boundedTarget != null);
+        _startJumpToPlatform(boundedTarget!);
         return;
       case PetRuntimeAction.chaseEmoji:
         _startChaseEmoji(liveTarget, payload: plan.payload);
@@ -614,6 +609,19 @@ class PetWorldController implements PetBehaviorRuntime {
       case PetRuntimeAction.parrotProbe:
         _startParrotProbe(liveTarget);
         return;
+    }
+  }
+
+  void _validateActionTarget(PetActionPlan plan, PetInteractable target) {
+    if (plan.runtimeAction != PetRuntimeAction.jumpToPlatform) return;
+
+    final liveTarget = _objectForId(target.id) ?? target;
+    if (liveTarget is! PetBoundedInteractable) {
+      throw ArgumentError.value(
+        target,
+        'target',
+        'jumpToPlatform requires a bounded target',
+      );
     }
   }
 
