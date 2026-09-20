@@ -74,31 +74,33 @@ class PixelPetSprite extends StatelessWidget {
     required this.state,
     this.direction = 1.0,
     this.frameIndex = 0,
-    this.size,
-  });
+    Size? size,
+  }) : _size = size;
 
   final PetType petType;
   final PetState state;
   final double direction;
   final int frameIndex;
-  final Size? size;
+  final Size? _size;
+
+  Size get size =>
+      _size ?? PetAnimationCatalog.resolve(petType, state).logicalSize;
 
   @override
   Widget build(BuildContext context) {
     final spec = PetAnimationCatalog.resolve(petType, state);
-    final resolvedSize = size ?? spec.logicalSize;
     final assetPath = spec.frameAt(frameIndex);
     final isFacingLeft = direction < 0;
 
     return SizedBox(
-      width: resolvedSize.width,
-      height: resolvedSize.height,
+      width: size.width,
+      height: size.height,
       child: Transform.flip(
         flipX: isFacingLeft,
         child: Image.asset(
           assetPath,
-          width: resolvedSize.width,
-          height: resolvedSize.height,
+          width: size.width,
+          height: size.height,
           fit: BoxFit.contain,
           filterQuality: FilterQuality.none,
           isAntiAlias: false,

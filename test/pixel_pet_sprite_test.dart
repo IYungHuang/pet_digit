@@ -258,6 +258,23 @@ void main() {
     testWidgets('PixelPet uses catalog size unless explicit size is supplied', (
       tester,
     ) async {
+      const omittedPet = PixelPet(state: PetState.idle);
+      const omittedSprite = PixelPetSprite(state: PetState.walk);
+      final Size petPublicSize = omittedPet.size;
+      final Size spritePublicSize = omittedSprite.size;
+      expect(petPublicSize, const Size(64, 64));
+      expect(spritePublicSize, const Size(64, 64));
+
+      const explicitPet = PixelPet(state: PetState.idle, size: Size(91, 47));
+      const explicitSprite = PixelPetSprite(
+        state: PetState.walk,
+        size: Size(83, 41),
+      );
+      final Size explicitPetPublicSize = explicitPet.size;
+      final Size explicitSpritePublicSize = explicitSprite.size;
+      expect(explicitPetPublicSize, const Size(91, 47));
+      expect(explicitSpritePublicSize, const Size(83, 41));
+
       await tester.pumpWidget(
         const Directionality(
           textDirection: TextDirection.ltr,
