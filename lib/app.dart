@@ -2,12 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'chat/presentation/chat_shell.dart';
+import 'chat/presentation/chat_providers.dart';
+import 'firebase/firebase_environment.dart';
 
 class ChatPetApp extends StatelessWidget {
-  const ChatPetApp({super.key});
+  const ChatPetApp({
+    super.key,
+    this.environment = const FirebaseEnvironment(
+      mode: FirebaseEnvironmentMode.fake,
+    ),
+  });
+
+  final FirebaseEnvironment environment;
 
   @override
   Widget build(BuildContext context) => ProviderScope(
+    overrides: [firebaseEnvironmentProvider.overrideWithValue(environment)],
     child: MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Chat Pet',
@@ -21,5 +31,17 @@ class ChatPetApp extends StatelessWidget {
       ),
       home: const ChatShell(showDemoAttachments: true),
     ),
+  );
+}
+
+class FirebaseStartupFailureApp extends StatelessWidget {
+  const FirebaseStartupFailureApp({super.key, required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: Scaffold(body: Center(child: Text(message))),
   );
 }

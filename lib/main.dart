@@ -5,6 +5,11 @@ import 'firebase/firebase_environment.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await FirebaseEnvironment.fromDartDefine().initialize();
-  runApp(const ChatPetApp());
+  try {
+    final environment = FirebaseEnvironment.fromDartDefine();
+    await environment.initialize();
+    runApp(ChatPetApp(environment: environment));
+  } catch (error) {
+    runApp(FirebaseStartupFailureApp(message: error.toString()));
+  }
 }

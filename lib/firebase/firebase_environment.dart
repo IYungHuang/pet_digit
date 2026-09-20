@@ -1,8 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
+
+import 'firebase_bootstrap.dart';
+import 'firebase_options_staging.dart';
 
 const firebaseFunctionsRegion = 'asia-east1';
 
@@ -73,7 +78,23 @@ class FirebaseEnvironment {
   Future<void> initialize() async {
     if (mode == FirebaseEnvironmentMode.fake) return;
     if (mode == FirebaseEnvironmentMode.staging) {
-      throw StateError('Staging Firebase configuration is not available');
+      FirebaseBootstrapPolicy.validateAppCheckMode(
+        staging: true,
+        debugBuild: kDebugMode,
+      );
+      await Firebase.initializeApp(
+        options: StagingFirebaseOptions.currentPlatform,
+      );
+      await FirebaseAppCheck.instance.activate(
+        appleProvider: AppleProvider.debug,
+      );
+      await ensureAnonymousFirebaseUser(
+        hasCurrentUser: FirebaseAuth.instance.currentUser != null,
+        signInAnonymously: () async {
+          await FirebaseAuth.instance.signInAnonymously();
+        },
+      );
+      return;
     }
 
     if (Firebase.apps.isEmpty) {
