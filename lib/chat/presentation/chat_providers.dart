@@ -37,27 +37,25 @@ final firebaseEnvironmentProvider = Provider<FirebaseEnvironment>(
 );
 
 final firebaseAuthProvider = Provider<FirebaseAuth?>((ref) {
-  final mode = ref.watch(firebaseEnvironmentProvider).mode;
-  return mode == FirebaseEnvironmentMode.fake ? null : FirebaseAuth.instance;
+  final environment = ref.watch(firebaseEnvironmentProvider);
+  return environment.usesBackendTransport ? FirebaseAuth.instance : null;
 });
 
 final firebaseFirestoreProvider = Provider<FirebaseFirestore?>((ref) {
-  final mode = ref.watch(firebaseEnvironmentProvider).mode;
-  return mode == FirebaseEnvironmentMode.fake
-      ? null
-      : FirebaseFirestore.instance;
+  final environment = ref.watch(firebaseEnvironmentProvider);
+  return environment.usesBackendTransport ? FirebaseFirestore.instance : null;
 });
 
 final firebaseStorageProvider = Provider<FirebaseStorage?>((ref) {
-  final mode = ref.watch(firebaseEnvironmentProvider).mode;
-  return mode == FirebaseEnvironmentMode.fake ? null : FirebaseStorage.instance;
+  final environment = ref.watch(firebaseEnvironmentProvider);
+  return environment.usesBackendTransport ? FirebaseStorage.instance : null;
 });
 
 final firebaseFunctionsProvider = Provider<FirebaseFunctions?>((ref) {
-  final mode = ref.watch(firebaseEnvironmentProvider).mode;
-  return mode == FirebaseEnvironmentMode.fake
-      ? null
-      : FirebaseFunctions.instanceFor(region: 'us-central1');
+  final environment = ref.watch(firebaseEnvironmentProvider);
+  return environment.usesBackendTransport
+      ? FirebaseFunctions.instanceFor(region: firebaseFunctionsRegion)
+      : null;
 });
 
 final chatEventSourceProvider = Provider<MessageEventSource>((ref) {
@@ -68,8 +66,7 @@ final chatEventSourceProvider = Provider<MessageEventSource>((ref) {
 });
 
 final useBackendTransportProvider = Provider<bool>((ref) {
-  return ref.watch(firebaseEnvironmentProvider).mode ==
-      FirebaseEnvironmentMode.emulator;
+  return ref.watch(firebaseEnvironmentProvider).usesBackendTransport;
 });
 
 final backendEventSourceProvider = Provider<MessageEventSource>((ref) {

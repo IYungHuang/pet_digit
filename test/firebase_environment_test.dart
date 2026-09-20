@@ -9,6 +9,22 @@ void main() {
     expect(FirebaseEnvironment.defaultMode, FirebaseEnvironmentMode.fake);
   });
 
+  test('staging targets production project and Taiwan Functions region', () {
+    final environment = FirebaseEnvironment.staging();
+
+    expect(environment.mode, FirebaseEnvironmentMode.staging);
+    expect(environment.projectId, 'pet-digit-backend');
+    expect(environment.functionsRegion, 'asia-east1');
+    expect(environment.usesBackendTransport, isTrue);
+  });
+
+  test('unknown transport fails closed', () {
+    expect(
+      () => FirebaseEnvironment.fromTransportValue('stagng'),
+      throwsFormatException,
+    );
+  });
+
   test('reads emulator ports from backend firebase.json shape', () {
     final environment = FirebaseEnvironment.fromBackendFirebaseJson(
       jsonDecode('''

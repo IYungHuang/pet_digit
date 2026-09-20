@@ -4,7 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
-enum FirebaseEnvironmentMode { fake, emulator, productionPlaceholder }
+const firebaseFunctionsRegion = 'asia-east1';
+
+enum FirebaseEnvironmentMode { fake, emulator, staging }
 
 class FirebaseEnvironment {
   const FirebaseEnvironment({
@@ -14,6 +16,7 @@ class FirebaseEnvironment {
     this.firestoreHost = '127.0.0.1:8080',
     this.storageHost = '127.0.0.1:9199',
     this.functionsHost = '127.0.0.1:5001',
+    this.functionsRegion = firebaseFunctionsRegion,
   });
 
   static const defaultMode = FirebaseEnvironmentMode.fake;
@@ -24,25 +27,35 @@ class FirebaseEnvironment {
   final String firestoreHost;
   final String storageHost;
   final String functionsHost;
+  final String functionsRegion;
+
+  bool get usesBackendTransport => mode != FirebaseEnvironmentMode.fake;
 
   static FirebaseEnvironment fromDartDefine() {
     const value = String.fromEnvironment(
       'CHAT_TRANSPORT',
       defaultValue: 'fake',
     );
-    return switch (value) {
-      'emulator' => localEmulator(),
-      'production' => const FirebaseEnvironment(
-        mode: FirebaseEnvironmentMode.productionPlaceholder,
-      ),
-      _ => const FirebaseEnvironment(mode: defaultMode),
-    };
+    return fromTransportValue(value);
   }
+
+  static FirebaseEnvironment fromTransportValue(String value) =>
+      switch (value) {
+        'fake' => const FirebaseEnvironment(mode: FirebaseEnvironmentMode.fake),
+        'emulator' => localEmulator(),
+        'staging' => staging(),
+        _ => throw FormatException('Unsupported CHAT_TRANSPORT: $value'),
+      };
 
   /// Values mirror backend firebase.json. Use [fromBackendFirebaseJson] when
   /// ports change; this factory keeps app default fake and credentials local.
   static FirebaseEnvironment localEmulator() =>
       const FirebaseEnvironment(mode: FirebaseEnvironmentMode.emulator);
+
+  static FirebaseEnvironment staging() => const FirebaseEnvironment(
+    mode: FirebaseEnvironmentMode.staging,
+    projectId: 'pet-digit-backend',
+  );
 
   factory FirebaseEnvironment.fromBackendFirebaseJson(
     Map<String, dynamic> json,
@@ -59,9 +72,6 @@ class FirebaseEnvironment {
 
   Future<void> initialize() async {
     if (mode == FirebaseEnvironmentMode.fake) return;
-    if (mode == FirebaseEnvironmentMode.productionPlaceholder) {
-      throw StateError('Production Firebase configuration is not available');
-    }
 
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
@@ -86,7 +96,7 @@ class FirebaseEnvironment {
     FirebaseStorage.instance.useStorageEmulator(storage.host, storage.port);
     final functions = _splitHost(functionsHost);
     FirebaseFunctions.instanceFor(
-      region: 'us-central1',
+      region: functionsRegion,
     ).useFunctionsEmulator(functions.host, functions.port);
   }
 

@@ -28,7 +28,9 @@ void main() {
       await environment.initialize();
       final auth = FirebaseAuth.instance;
       final firestore = FirebaseFirestore.instance;
-      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+      final functions = FirebaseFunctions.instanceFor(
+        region: firebaseFunctionsRegion,
+      );
       final storage = FirebaseStorage.instance;
       final user = (await auth.signInAnonymously()).user!;
       const roomId = 'flutter-emulator-room';

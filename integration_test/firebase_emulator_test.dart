@@ -34,7 +34,9 @@ void main() {
     );
     final repository = FirebaseMessageRepository(
       remote: FirebaseMessageRemoteDataSource(
-        functions: FirebaseFunctions.instanceFor(region: 'us-central1'),
+        functions: FirebaseFunctions.instanceFor(
+          region: firebaseFunctionsRegion,
+        ),
         auth: auth,
       ),
       upload: FirebaseMediaUploadDataSource(
