@@ -69,6 +69,14 @@ class StagingMembershipController
       return false;
     }
   }
+
+  /// Resets back to [StagingMembershipStatus.waiting], e.g. when the UI
+  /// switches to a room whose membership has never been verified. Callers
+  /// must invalidate the room-scoped providers themselves afterward so they
+  /// re-evaluate against the reset gate.
+  void reset() {
+    state = StagingMembershipStatus.waiting;
+  }
 }
 
 final firebaseEnvironmentProvider = Provider<FirebaseEnvironment>(
@@ -108,6 +116,14 @@ final useBackendTransportProvider = Provider<bool>((ref) {
   return ref.watch(firebaseEnvironmentProvider).usesBackendTransport;
 });
 
+/// Pure access decision for a `rooms/{roomId}/members/{uid}` document read:
+/// membership is active only when the document exists and its `active`
+/// field is exactly `true`. Extracted so the predicate itself is directly
+/// unit-testable without standing up Firestore.
+bool isActiveRoomMember(bool docExists, Map<String, dynamic>? data) {
+  return docExists && data?['active'] == true;
+}
+
 /// Reads `rooms/{roomId}/members/{currentUid}` and succeeds only when the
 /// document exists with `active == true`. Outside staging this is a no-op:
 /// the controller never needs to call it because it starts `notRequired`.
@@ -125,7 +141,7 @@ final roomMembershipProbeProvider = Provider<RoomMembershipProbe>((ref) {
     final uid = auth.currentUser?.uid;
     if (uid == null) throw StateError('Staging user is not authenticated');
     final member = await firestore.doc('rooms/$roomId/members/$uid').get();
-    if (!member.exists || member.data()?['active'] != true) {
+    if (!isActiveRoomMember(member.exists, member.data())) {
       throw FirebaseException(
         plugin: 'cloud_firestore',
         code: 'permission-denied',

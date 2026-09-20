@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -382,6 +383,46 @@ void main() {
       expect(values.last.single.clientId, 'persisted');
     },
   );
+
+  group('isActiveRoomMember', () {
+    test('missing membership document is not an active member', () {
+      expect(isActiveRoomMember(false, null), isFalse);
+    });
+
+    test('membership document with active: false is not an active member', () {
+      expect(isActiveRoomMember(true, {'active': false}), isFalse);
+    });
+
+    test(
+      'membership document without an active key is not an active member',
+      () {
+        expect(isActiveRoomMember(true, {'other': 1}), isFalse);
+      },
+    );
+
+    test('membership document with active: true is an active member', () {
+      expect(isActiveRoomMember(true, {'active': true}), isTrue);
+    });
+  });
+
+  test(
+    'probe throws StateError when the staging user is not authenticated',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          firebaseEnvironmentProvider.overrideWithValue(
+            const FirebaseEnvironment(mode: FirebaseEnvironmentMode.staging),
+          ),
+          firebaseFirestoreProvider.overrideWithValue(_UnusedFakeFirestore()),
+          firebaseAuthProvider.overrideWithValue(_FakeAuthWithoutUser()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final probe = container.read(roomMembershipProbeProvider);
+      await expectLater(probe('friends'), throwsA(isA<StateError>()));
+    },
+  );
 }
 
 FakeMessageRepository _createRepository(FakeMessageEventSource events) =>
@@ -390,3 +431,21 @@ FakeMessageRepository _createRepository(FakeMessageEventSource events) =>
       upload: FakeMediaUploadDataSource(latency: Duration.zero),
       events: events,
     );
+
+/// Minimal [FirebaseAuth] fake with no signed-in user, so the probe's
+/// `uid == null` guard is exercised without a real Firebase app.
+class _FakeAuthWithoutUser implements FirebaseAuth {
+  @override
+  User? get currentUser => null;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Placeholder [FirebaseFirestore] fake that is never actually read: the
+/// probe throws on the `uid == null` guard before touching Firestore, so
+/// this only needs to satisfy the non-null provider type.
+class _UnusedFakeFirestore implements FirebaseFirestore {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}

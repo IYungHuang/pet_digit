@@ -17,6 +17,7 @@ import '../../pet/domain/pet_world.dart';
 import '../../pet/domain/pet_world_controller.dart';
 import '../../pet/domain/pet_message_target_factory.dart';
 import '../../pet/presentation/pet_world_overlay.dart';
+import '../../firebase/firebase_environment.dart';
 import '../application/media_picker_service.dart';
 import 'chat_providers.dart';
 import 'chat_timeline_policy.dart';
@@ -143,6 +144,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
       _isNearBottom = true;
       _world.loadRoom(_room);
     });
+    _resetStagingMembershipForRoomSwitch();
     _composerController.value = TextEditingValue(
       text: _roomDrafts[id] ?? '',
       selection: TextSelection.collapsed(
@@ -270,22 +272,48 @@ class _ChatShellState extends ConsumerState<ChatShell> {
     });
   }
 
+  bool get _roomAccessReady {
+    final status = ref.read(stagingMembershipControllerProvider);
+    return status == StagingMembershipStatus.ready ||
+        status == StagingMembershipStatus.notRequired;
+  }
+
   void _reconnect() {
+    if (!_roomAccessReady) return;
     if (_scrollController.hasClients) {
       _roomScrollOffsets[_activeRoomId] = _scrollController.position.pixels;
     }
     unawaited(ref.read(chatRepositoryProvider).reconnect());
   }
 
-  Future<void> _retryMembership() async {
-    final controller = ref.read(stagingMembershipControllerProvider.notifier);
-    final success = await controller.verify(_activeRoomId);
-    if (!success || !mounted) return;
+  /// Invalidates the room-scoped providers so they re-evaluate against the
+  /// current staging membership gate. Shared by [_retryMembership] and
+  /// [_resetStagingMembershipForRoomSwitch] so the two call sites can't
+  /// drift apart.
+  void _invalidateRoomScopedProviders() {
     ref.invalidate(roomMessagesProvider(_activeRoomId));
     ref.invalidate(chatConnectionProvider);
     ref.invalidate(messageDeltaProvider);
     ref.invalidate(messageConnectionStateProvider);
     ref.invalidate(sendMessageProvider);
+  }
+
+  /// Resets the staging membership gate back to `waiting` when switching
+  /// rooms, so a room switch can't silently inherit membership proven for a
+  /// different room. Fake/emulator transports never require this gate and
+  /// stay `notRequired`.
+  void _resetStagingMembershipForRoomSwitch() {
+    final environment = ref.read(firebaseEnvironmentProvider);
+    if (environment.mode != FirebaseEnvironmentMode.staging) return;
+    ref.read(stagingMembershipControllerProvider.notifier).reset();
+    _invalidateRoomScopedProviders();
+  }
+
+  Future<void> _retryMembership() async {
+    final controller = ref.read(stagingMembershipControllerProvider.notifier);
+    final success = await controller.verify(_activeRoomId);
+    if (!success || !mounted) return;
+    _invalidateRoomScopedProviders();
   }
 
   void _retry(ChatMessage message) {
@@ -418,7 +446,8 @@ class _ChatShellState extends ConsumerState<ChatShell> {
             uid: membershipUid,
             onRetry: _retryMembership,
           ),
-          _ConnectionBanner(state: connectionState, onReconnect: _reconnect),
+          if (roomAccessReady)
+            _ConnectionBanner(state: connectionState, onReconnect: _reconnect),
           Expanded(
             child: Stack(
               key: _stackKey,

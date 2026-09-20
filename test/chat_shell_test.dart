@@ -16,6 +16,7 @@ import 'package:chat_pet_mvp/chat/domain/message_content.dart';
 import 'package:chat_pet_mvp/chat/domain/message_status.dart';
 import 'package:chat_pet_mvp/chat/presentation/chat_providers.dart';
 import 'package:chat_pet_mvp/chat/presentation/chat_shell.dart';
+import 'package:chat_pet_mvp/firebase/firebase_environment.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_world.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_world_controller.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_presentation_state.dart';
@@ -698,6 +699,99 @@ void main() {
       expect(find.text('Retry'), findsNothing);
       textField = tester.widget<TextField>(find.byType(TextField));
       expect(textField.enabled, isTrue);
+    },
+  );
+
+  testWidgets(
+    'connection banner stays hidden while staging membership is not ready',
+    (tester) async {
+      final events = FakeMessageEventSource();
+      final repository = FakeMessageRepository(
+        remote: FakeMessageRemoteDataSource(),
+        upload: FakeMediaUploadDataSource(),
+        events: events,
+      );
+      addTearDown(repository.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            chatEventSourceProvider.overrideWithValue(events),
+            chatRepositoryProvider.overrideWithValue(repository),
+            firebaseAuthProvider.overrideWithValue(
+              _FakeFirebaseAuth(_FakeUser('uid-connection-banner')),
+            ),
+            stagingMembershipControllerProvider.overrideWith(
+              (ref) => StagingMembershipController(
+                initialState: StagingMembershipStatus.waiting,
+                probe: (_) async {},
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: ChatShell()),
+        ),
+      );
+      await _pumpChat(tester);
+
+      // The membership banner explains the blocked state; the connection
+      // banner (and its reconnect retry) must not also show while gated.
+      expect(find.text('尚未連線'), findsNothing);
+      expect(find.widgetWithText(TextButton, '重新連線'), findsNothing);
+      expect(find.textContaining('uid-connection-banner'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'switching rooms while staging resets the membership gate and re-locks the composer',
+    (tester) async {
+      final events = FakeMessageEventSource();
+      final repository = FakeMessageRepository(
+        remote: FakeMessageRemoteDataSource(latency: Duration.zero),
+        upload: FakeMediaUploadDataSource(latency: Duration.zero),
+        events: events,
+      );
+      addTearDown(repository.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            chatEventSourceProvider.overrideWithValue(events),
+            chatRepositoryProvider.overrideWithValue(repository),
+            firebaseEnvironmentProvider.overrideWithValue(
+              const FirebaseEnvironment(mode: FirebaseEnvironmentMode.staging),
+            ),
+            firebaseAuthProvider.overrideWithValue(
+              _FakeFirebaseAuth(_FakeUser('uid-room-switch')),
+            ),
+            stagingMembershipControllerProvider.overrideWith(
+              (ref) => StagingMembershipController(
+                initialState: StagingMembershipStatus.waiting,
+                probe: (_) async {},
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: ChatShell()),
+        ),
+      );
+      await _pumpChat(tester);
+
+      // Verify membership for the initial room ("friends" / Pixel Pals).
+      await tester.tap(find.widgetWithText(TextButton, 'Retry'));
+      await tester.pump();
+      await _pumpChat(tester);
+
+      expect(find.text('Retry'), findsNothing);
+      var textField = tester.widget<TextField>(find.byType(TextField));
+      expect(textField.enabled, isTrue);
+
+      // Switching rooms must not carry the "friends" verification over to
+      // "family" (Family Nest) — the gate should re-lock until verified.
+      await tester.tap(find.text('Family Nest'));
+      await _pumpChat(tester);
+
+      expect(find.widgetWithText(TextButton, 'Retry'), findsOneWidget);
+      textField = tester.widget<TextField>(find.byType(TextField));
+      expect(textField.enabled, isFalse);
     },
   );
 
