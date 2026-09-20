@@ -136,6 +136,66 @@ void main() {
     expect(controller.position.dy, 248);
   });
 
+  for (final action in ['paw', 'dog probe', 'parrot probe']) {
+    test(
+      '$action canonical migration immediately before impact uses new spring',
+      () {
+        final controller = PetWorldController()
+          ..setPet(switch (action) {
+            'paw' => PetType.cat,
+            'dog probe' => PetType.corgi,
+            _ => PetType.parrot,
+          })
+          ..setMessageBubbleTargets([_message()])
+          ..updateObjectBounds({'client': _bounds});
+        final original = controller.objects.single;
+        switch (action) {
+          case 'paw':
+            controller.startPawTest(original);
+            controller.tick(const Duration(milliseconds: 1990));
+          case 'dog probe':
+            controller.startDogProbe(original);
+            controller.tick(const Duration(milliseconds: 1690));
+          case 'parrot probe':
+            controller.startParrotProbe(original);
+            controller.tick(const Duration(milliseconds: 1690));
+        }
+
+        controller.setMessageBubbleTargets([_message(serverId: 'server')]);
+        const replacementBounds = Rect.fromLTWH(240, 360, 160, 60);
+        controller.updateObjectBounds({'server': replacementBounds});
+        controller.tick(const Duration(milliseconds: 20));
+
+        expect(controller.activeTarget, same(controller.objects.single));
+        expect(controller.activeTarget?.id, 'server');
+        expect(controller.activeTarget?.bounds, replacementBounds);
+        expect(controller.getBubbleDeflection('client'), 0);
+        expect(controller.currentAction, isNot(PetActionType.none));
+        controller.tick(const Duration(milliseconds: 16));
+        expect(controller.getBubbleDeflection('server'), greaterThan(0));
+      },
+    );
+  }
+
+  test('action clock preserves world millisecond truncation per tick', () {
+    final controller = PetWorldController()
+      ..setPet(PetType.cat)
+      ..setMessageBubbleTargets([_message()])
+      ..updateObjectBounds({'client': _bounds});
+    controller.startPawTest(controller.objects.single);
+    final beforeImpact = controller.springNotifier.value;
+
+    for (var index = 0; index < 121; index++) {
+      controller.tick(const Duration(microseconds: 16666));
+    }
+    expect(controller.springNotifier.value, beforeImpact);
+
+    for (var index = 0; index < 4; index++) {
+      controller.tick(const Duration(microseconds: 16666));
+    }
+    expect(controller.springNotifier.value, greaterThan(beforeImpact));
+  });
+
   test('same client ID in another room never inherits pending or bounds', () {
     final controller = PetWorldController()
       ..setMessageBubbleTargets([_message()])

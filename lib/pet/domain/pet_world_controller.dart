@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../chat/domain/chat_models.dart';
 import '../../chat/domain/chat_message.dart' as domain;
 import 'pet_action_plan.dart';
+import 'pet_action_runner.dart';
 import 'pet_behavior_catalog.dart';
 import 'pet_behavior_executor.dart';
 import 'pet_behavior_normalizer.dart';
@@ -48,7 +49,9 @@ class PetWorldController implements PetBehaviorRuntime {
   PetConfig get petConfig => PetConfig.of(selectedPet);
 
   void setPet(PetType newPet) {
-    if (newPet != selectedPet) _resetActiveAction();
+    if (newPet != selectedPet) {
+      _resetActiveAction(reason: PetActionEndReason.petChanged);
+    }
     _selectedPet = newPet;
     pawPrints.clear();
     particles.clear();
@@ -129,10 +132,8 @@ class PetWorldController implements PetBehaviorRuntime {
   double _jumpArcHeight = 45.0;
 
   // Action target
-  PetInteractable? _activeTarget;
-  Object? _activePayload;
+  final PetActionRunner _actionRunner = PetActionRunner();
   bool _walkTowardObservationTarget = false;
-  double _actionElapsed = 0.0;
   double _dustTimer = 0.0;
   double _stepBounceTimer = 0.0;
   Offset _pawTestStart = Offset.zero;
@@ -147,8 +148,14 @@ class PetWorldController implements PetBehaviorRuntime {
   bool _inspectUsesRightSide = false;
   _PendingStimulus? _pendingStimulus;
 
-  PetInteractable? get activeTarget => _activeTarget;
-  Object? get activePayload => _activePayload;
+  PetInteractable? get activeTarget => _actionRunner.target;
+  Object? get activePayload => _actionRunner.payload;
+  double get _actionElapsed =>
+      _actionRunner.totalElapsed.inMicroseconds /
+      Duration.microsecondsPerSecond;
+  double get _actionPhaseElapsed =>
+      _actionRunner.phaseElapsed.inMicroseconds /
+      Duration.microsecondsPerSecond;
 
   int get frameIndex {
     switch (state) {
@@ -214,10 +221,8 @@ class PetWorldController implements PetBehaviorRuntime {
     _walkDirection = 1;
     currentAction = PetActionType.none;
     currentPlatform = null;
-    _activeTarget = null;
-    _activePayload = null;
+    _actionRunner.end(PetActionEndReason.worldReset);
     _walkTowardObservationTarget = false;
-    _actionElapsed = 0.0;
     _dustTimer = 0.0;
     _stepBounceTimer = 0.0;
     _pawStepTimer = 0.0;
@@ -311,7 +316,7 @@ class PetWorldController implements PetBehaviorRuntime {
       if (spring != null) nextSprings[next.id] = spring;
     }
 
-    final active = _activeTarget;
+    final active = _actionRunner.target;
     final nextActive = replacements[active];
     final platform = currentPlatform;
     final nextPlatform = replacements[platform];
@@ -320,9 +325,9 @@ class PetWorldController implements PetBehaviorRuntime {
     if ((active != null &&
             (nextActive == null || nextActive.kind != active.kind)) ||
         (platform != null && nextPlatform == null)) {
-      _resetActiveAction();
+      _resetActiveAction(reason: PetActionEndReason.targetRemoved);
     } else {
-      _activeTarget = nextActive;
+      if (nextActive != null) _actionRunner.retarget(nextActive);
       currentPlatform = nextPlatform;
       if (pending != null) {
         final nextPending = replacements[pending.target];
@@ -340,16 +345,14 @@ class PetWorldController implements PetBehaviorRuntime {
     if (springsChanged) springNotifier.value++;
   }
 
-  void _resetActiveAction() {
-    _activeTarget = null;
-    _activePayload = null;
+  void _resetActiveAction({required PetActionEndReason reason}) {
+    _actionRunner.end(reason);
     currentPlatform = null;
     currentAction = PetActionType.none;
     state = PetState.idle;
     bouncingToy = null;
     _walkTowardObservationTarget = false;
     _pendingStimulus = null;
-    _actionElapsed = 0;
     _time = 0;
   }
 
@@ -369,8 +372,8 @@ class PetWorldController implements PetBehaviorRuntime {
 
   void _syncTargetGeometry() {
     if (currentAction == PetActionType.jumpToPlatform &&
-        _activeTarget != null) {
-      _jumpTarget = _platformLandingPosition(_activeTarget!.bounds);
+        _actionRunner.target != null) {
+      _jumpTarget = _platformLandingPosition(_actionRunner.target!.bounds);
     }
     if (currentPlatform != null) {
       final bounds = currentPlatform!.bounds;
@@ -412,7 +415,7 @@ class PetWorldController implements PetBehaviorRuntime {
     if (dt <= 0) return;
 
     _time += dt;
-    _actionElapsed += dt;
+    _actionRunner.advance(Duration(milliseconds: elapsed.inMilliseconds));
     _dustTimer += dt;
     _stepBounceTimer += dt;
 
@@ -549,16 +552,14 @@ class PetWorldController implements PetBehaviorRuntime {
       .firstWhere((item) => item?.id == objectId, orElse: () => null);
 
   PetInteractable _beginRuntimeAction(
-    PetInteractable target,
-    Object? payload, {
+    PetActionPlan plan,
+    PetInteractable target, {
     required double platformImpulse,
   }) {
     _cancelActiveRuntimeArtifacts(platformImpulse: platformImpulse);
     _pendingStimulus = null;
     final liveTarget = _objectForId(target.id) ?? target;
-    _activeTarget = liveTarget;
-    _activePayload = payload;
-    _actionElapsed = 0.0;
+    _actionRunner.start(plan, liveTarget);
     _time = 0.0;
     _dustTimer = 0.0;
     _stepBounceTimer = 0.0;
@@ -576,8 +577,8 @@ class PetWorldController implements PetBehaviorRuntime {
         ? 70.0
         : 60.0;
     final liveTarget = _beginRuntimeAction(
+      plan,
       target,
-      plan.payload,
       platformImpulse: platformImpulse,
     );
 
@@ -681,7 +682,8 @@ class PetWorldController implements PetBehaviorRuntime {
 
     if (progress >= 1.0) {
       currentAction = PetActionType.none;
-      currentPlatform = _activeTarget as PetBoundedInteractable?;
+      currentPlatform = _actionRunner.target as PetBoundedInteractable?;
+      _actionRunner.end(PetActionEndReason.completed);
       state = PetState.idle;
       _time = 0.0;
 
@@ -739,6 +741,7 @@ class PetWorldController implements PetBehaviorRuntime {
       currentAction = PetActionType.none;
       state = PetState.idle;
       _time = 0.0;
+      _actionRunner.end(PetActionEndReason.completed);
       return;
     }
 
@@ -778,6 +781,7 @@ class PetWorldController implements PetBehaviorRuntime {
         state = PetState.idle;
         _time = 0.0;
         bouncingToy = null;
+        _actionRunner.end(PetActionEndReason.completed);
       }
     }
   }
@@ -802,10 +806,11 @@ class PetWorldController implements PetBehaviorRuntime {
   }
 
   void _tickInspectGif(double dt) {
-    final target = _activeTarget;
+    final target = _actionRunner.target;
     if (target == null) {
       currentAction = PetActionType.none;
       state = PetState.idle;
+      _actionRunner.end(PetActionEndReason.targetRemoved);
       return;
     }
 
@@ -853,6 +858,7 @@ class PetWorldController implements PetBehaviorRuntime {
       currentAction = PetActionType.none;
       state = PetState.idle;
       _time = 0.0;
+      _actionRunner.end(PetActionEndReason.completed);
     }
   }
 
@@ -882,10 +888,11 @@ class PetWorldController implements PetBehaviorRuntime {
   }
 
   void _tickPawTest(double dt) {
-    final target = _activeTarget;
+    final target = _actionRunner.target;
     if (target == null) {
       currentAction = PetActionType.none;
       state = PetState.idle;
+      _actionRunner.end(PetActionEndReason.targetRemoved);
       return;
     }
 
@@ -945,6 +952,7 @@ class PetWorldController implements PetBehaviorRuntime {
     currentAction = PetActionType.none;
     state = PetState.idle;
     _time = 0.0;
+    _actionRunner.end(PetActionEndReason.completed);
   }
 
   bool _usesRightSideOf(Rect bounds) {
@@ -1000,10 +1008,11 @@ class PetWorldController implements PetBehaviorRuntime {
   }
 
   void _tickDogProbe(double dt) {
-    final target = _activeTarget;
+    final target = _actionRunner.target;
     if (target == null) {
       currentAction = PetActionType.none;
       state = PetState.idle;
+      _actionRunner.end(PetActionEndReason.targetRemoved);
       return;
     }
     final targetPosition = _messageSidePosition(
@@ -1035,6 +1044,7 @@ class PetWorldController implements PetBehaviorRuntime {
     if (_actionElapsed >= 2.8) {
       currentAction = PetActionType.none;
       state = PetState.idle;
+      _actionRunner.end(PetActionEndReason.completed);
     }
   }
 
@@ -1056,10 +1066,11 @@ class PetWorldController implements PetBehaviorRuntime {
   }
 
   void _tickParrotProbe(double dt) {
-    final target = _activeTarget;
+    final target = _actionRunner.target;
     if (target == null) {
       currentAction = PetActionType.none;
       state = PetState.idle;
+      _actionRunner.end(PetActionEndReason.targetRemoved);
       return;
     }
     final targetPosition = _messageSidePosition(
@@ -1090,6 +1101,7 @@ class PetWorldController implements PetBehaviorRuntime {
     if (_actionElapsed >= 2.7) {
       currentAction = PetActionType.none;
       state = PetState.idle;
+      _actionRunner.end(PetActionEndReason.completed);
     }
   }
 
@@ -1129,18 +1141,19 @@ class PetWorldController implements PetBehaviorRuntime {
   }
 
   void _tickObserveTarget(double dt) {
-    final target = _activeTarget;
+    final target = _actionRunner.target;
     if (target == null) {
       currentAction = PetActionType.none;
       state = PetState.idle;
+      _actionRunner.end(PetActionEndReason.targetRemoved);
       return;
     }
     if (!_walkTowardObservationTarget) {
       state = PetState.observe;
-      if (_actionElapsed >= 0.9) {
+      if (_actionPhaseElapsed >= 0.9) {
         currentAction = PetActionType.none;
         state = PetState.idle;
-        _activeTarget = null;
+        _actionRunner.end(PetActionEndReason.completed);
       }
       return;
     }
@@ -1155,7 +1168,7 @@ class PetWorldController implements PetBehaviorRuntime {
     if (distance <= 12) {
       _walkTowardObservationTarget = false;
       state = PetState.observe;
-      _actionElapsed = 0;
+      _actionRunner.beginPhase();
       return;
     }
 
@@ -1167,7 +1180,7 @@ class PetWorldController implements PetBehaviorRuntime {
       position = targetPosition;
       _walkTowardObservationTarget = false;
       state = PetState.observe;
-      _actionElapsed = 0;
+      _actionRunner.beginPhase();
       return;
     }
     position = Offset(
