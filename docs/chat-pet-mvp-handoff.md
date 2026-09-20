@@ -34,6 +34,52 @@ Flame, `flame_behaviors`, Forge2D, Rive, and Spine remain intentionally absent.
 Current synchronous Flutter runtime is preserved; engine adoption requires a
 separate measured migration proposal.
 
+### Final runtime refactor verification — 2026-09-20
+
+Branch `feat/cat-paw-test` was verified from runtime baseline `9aae760` through
+`5e35fbc` without Flame or another game-engine dependency. Commit chain:
+
+```text
+a4acb79 docs(pet): plan runtime architecture refactor
+cb24835 test(pet): characterize runtime lifecycle
+833450c test(pet): cover runtime review gaps
+efa4d5a test(pet): cover large tick impacts
+17d504a fix(pet): correct corgi walk cycle
+8c85e4e test(pet): compare visible corgi frame pixels
+2b6ace7 refactor(pet): centralize animation mappings
+0e87a5c fix(pet): preserve public sprite size API
+c27be4a refactor(pet): execute immutable action plans
+ad37762 fix(pet): validate action plans before mutation
+e00f221 refactor(pet): extract live action lifecycle
+8e90675 refactor(pet): extract action timeline handlers
+a47e20c fix(pet): harden action handler contracts
+5e35fbc refactor(pet): separate runtime presentation state
+```
+
+Fresh verification evidence:
+
+- `flutter analyze`: exit 0, no issues.
+- `flutter test`: exit 0, 350 tests passed.
+- `git diff --check HEAD`: exit 0.
+- `./scripts/commit_gate.sh`: exit 0; analyze, all 350 tests, and diff check
+  passed.
+- Independent final branch review returned `No actionable regressions found`;
+  Task 8 records this as APPROVE with no Critical, High, or Medium finding.
+- `dart format --output=none --set-exit-if-changed lib test`: exit 1 and named
+  eight pre-existing files outside this runtime refactor's Task 8 changes.
+  Task 8 did not apply unrelated formatting because its scope permits code edits
+  only for a reproduced regression with a failing test first.
+
+Cold-start macOS verification used a newly built process, not hot reload. It
+visually exercised corgi idle/walk, cat media interaction, parrot patrol/probe,
+existing GIF interaction, new demo JPG/MP4 arrival, old-message taps, scrolling
+with live bubble positions, room switching, and pet-switch cancellation. Fake
+mode stayed connected, so no reconnect button appeared; reconnect preservation
+is covered by the passing repository, provider, and snapshot-origin tests.
+Computer-use screenshots were observed during the run but could not be exported
+to repository files. Task 2's persisted contact sheets and 150 ms widget capture
+remain the reproducible corgi gait evidence.
+
 ## Runtime integration update — 2026-09-19
 
 This section is the current pet runtime handoff. The original 2026-09-18 report below is retained as historical context; its test count, fixed-coordinate limitations, and proposed implementation phases are not the current runtime status.
