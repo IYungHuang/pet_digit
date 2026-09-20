@@ -87,6 +87,7 @@ class FirebaseEnvironment {
       );
       await FirebaseAppCheck.instance.activate(
         appleProvider: AppleProvider.debug,
+        androidProvider: AndroidProvider.debug,
       );
       await ensureAnonymousFirebaseUser(
         hasCurrentUser: FirebaseAuth.instance.currentUser != null,

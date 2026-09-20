@@ -10,4 +10,12 @@ void main() {
     expect(options.storageBucket, 'pet-digit-backend.firebasestorage.app');
     expect(options.iosBundleId, 'com.iyunghuang.petdigitchat');
   });
+
+  test('staging Android options target registered Firebase app', () {
+    const options = StagingFirebaseOptions.android;
+    expect(options.projectId, 'pet-digit-backend');
+    expect(options.appId, '1:473616221902:android:2b351d8404aca9e53a729f');
+    expect(options.messagingSenderId, '473616221902');
+    expect(options.storageBucket, 'pet-digit-backend.firebasestorage.app');
+  });
 }

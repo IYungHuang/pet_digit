@@ -11,6 +11,14 @@ class StagingFirebaseOptions {
     iosBundleId: 'com.iyunghuang.petdigitchat',
   );
 
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyDSSQvedn8sC8dmRyKu8_MAvPYBqKxk_4g',
+    appId: '1:473616221902:android:2b351d8404aca9e53a729f',
+    messagingSenderId: '473616221902',
+    projectId: 'pet-digit-backend',
+    storageBucket: 'pet-digit-backend.firebasestorage.app',
+  );
+
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
       throw UnsupportedError(
@@ -20,6 +28,7 @@ class StagingFirebaseOptions {
 
     return switch (defaultTargetPlatform) {
       TargetPlatform.iOS || TargetPlatform.macOS => apple,
+      TargetPlatform.android => android,
       _ => throw UnsupportedError(
         'Staging Firebase options are not configured for this platform.',
       ),
