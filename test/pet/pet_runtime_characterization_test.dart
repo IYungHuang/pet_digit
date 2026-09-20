@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:chat_pet_mvp/pet/domain/pet_behavior_runtime.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_effects.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_message_content_kind.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_message_target.dart';
@@ -23,6 +24,7 @@ void main() {
       expect(controller.currentAction, PetActionType.none);
       expect(controller.state, PetState.idle);
       expect(controller.activeTarget, same(clientTarget));
+      expect(controller.activePayload, isNull);
       expect(controller.currentPlatform, same(clientTarget));
       expect(controller.getBubbleDeflection('client'), 0.0);
       expect(controller.springNotifier.value, 1);
@@ -127,6 +129,119 @@ void main() {
       },
     );
   }
+
+  test(
+    'mid-jump replacement drops airborne effects and resets replacement timing',
+    () {
+      final controller = PetWorldController();
+      final platform = _target(id: 'platform');
+      final media = _target(id: 'media');
+      final payload = <String, Object>{'media': 'gif-mid-jump'};
+
+      controller.startJumpToPlatform(platform);
+      controller.tick(const Duration(milliseconds: 200));
+      expect(controller.currentAction, PetActionType.jumpToPlatform);
+      expect(controller.state, PetState.jump);
+
+      controller.startInspectGif(media, payload: payload);
+
+      expect(controller.currentAction, PetActionType.inspectGif);
+      expect(controller.activeTarget, same(media));
+      expect(controller.activePayload, same(payload));
+      expect(controller.currentPlatform, isNull);
+      expect(controller.particles, isEmpty);
+      expect(controller.getBubbleDeflection(platform.id), 0.0);
+      controller.tick(const Duration(milliseconds: 2799));
+      expect(controller.currentAction, PetActionType.inspectGif);
+      controller.tick(const Duration(milliseconds: 1));
+      expect(controller.currentAction, PetActionType.none);
+    },
+  );
+
+  test(
+    'mid-chase replacement clears toy while preserving released platform effect',
+    () {
+      final controller = PetWorldController();
+      final platform = _target(id: 'platform');
+      final chaseTarget = _target(id: 'emoji');
+      final media = _target(id: 'media');
+      final chasePayload = <String, Object>{'emoji': '🎾'};
+      final mediaPayload = <String, Object>{'media': 'gif-mid-chase'};
+
+      controller.startJumpToPlatform(platform);
+      controller.tick(const Duration(milliseconds: 550));
+      controller.tick(const Duration(seconds: 2));
+      controller.startChaseEmoji(chaseTarget, payload: chasePayload);
+      controller.tick(const Duration(milliseconds: 101));
+      final releasedPlatformDeflection = controller.getBubbleDeflection(
+        platform.id,
+      );
+      final notificationsBeforeReplacement = controller.springNotifier.value;
+
+      expect(controller.currentAction, PetActionType.chaseEmoji);
+      expect(controller.activeTarget, same(chaseTarget));
+      expect(controller.activePayload, same(chasePayload));
+      expect(controller.currentPlatform, isNull);
+      expect(controller.bouncingToy, isNotNull);
+
+      controller.startInspectGif(media, payload: mediaPayload);
+
+      expect(controller.currentAction, PetActionType.inspectGif);
+      expect(controller.activeTarget, same(media));
+      expect(controller.activePayload, same(mediaPayload));
+      expect(controller.currentPlatform, isNull);
+      expect(controller.bouncingToy, isNull);
+      expect(
+        controller.getBubbleDeflection(platform.id),
+        releasedPlatformDeflection,
+      );
+      expect(controller.springNotifier.value, notificationsBeforeReplacement);
+      controller.tick(const Duration(milliseconds: 2799));
+      expect(controller.currentAction, PetActionType.inspectGif);
+      controller.tick(const Duration(milliseconds: 1));
+      expect(controller.currentAction, PetActionType.none);
+    },
+  );
+
+  test(
+    'unmeasured pending target follows canonical reconciliation and removal',
+    () {
+      const source = (roomId: 'room', clientId: 'client');
+      final controller = PetWorldController();
+      final clientTarget = _unmeasuredTarget(
+        id: 'client',
+        sourceIdentity: source,
+      );
+      controller.setMessageTargets([clientTarget]);
+
+      expect(
+        controller.interact(clientTarget.id).status,
+        PetBehaviorExecutionStatus.ignored,
+      );
+      expect(controller.currentAction, PetActionType.none);
+      expect(controller.activeTarget, isNull);
+
+      final serverTarget = _unmeasuredTarget(
+        id: 'server',
+        sourceIdentity: source,
+      );
+      controller.setMessageTargets([serverTarget]);
+      controller.updateObjectBounds({
+        serverTarget.id: const Rect.fromLTWH(100, 200, 180, 52),
+      });
+
+      expect(controller.currentAction, PetActionType.jumpToPlatform);
+      expect(controller.activeTarget, same(serverTarget));
+      controller.setMessageTargets([]);
+
+      expect(controller.currentAction, PetActionType.none);
+      expect(controller.state, PetState.idle);
+      expect(controller.activeTarget, isNull);
+      expect(controller.activePayload, isNull);
+      expect(controller.currentPlatform, isNull);
+      expect(controller.bouncingToy, isNull);
+    },
+  );
 
   final inspectionPayload = <String, Object>{'media': 'gif-1'};
   for (final completion
@@ -263,6 +378,61 @@ void main() {
       expect(controller.bouncingToy, isNull);
       expect(controller.activeTarget, same(target));
       expect(controller.activePayload, same(payload));
+
+      final replacement = _target(id: 'media');
+      final replacementPayload = <String, Object>{'media': 'gif-caught'};
+      controller.startInspectGif(replacement, payload: replacementPayload);
+      expect(controller.activeTarget, same(replacement));
+      expect(controller.activePayload, same(replacementPayload));
+
+      controller.setPet(PetType.cat);
+      expect(controller.currentAction, PetActionType.none);
+      expect(controller.activeTarget, isNull);
+      expect(controller.activePayload, isNull);
+      expect(controller.bouncingToy, isNull);
+    },
+  );
+
+  test('ordinary chase remains active immediately before toy expiry', () {
+    final controller = PetWorldController();
+    final target = _target(id: 'emoji');
+    final payload = <String, Object>{'emoji': '🎾'};
+
+    controller.startChaseEmoji(target, payload: payload);
+    controller.tick(const Duration(milliseconds: 3500));
+
+    expect(controller.currentAction, PetActionType.chaseEmoji);
+    expect(controller.bouncingToy, isNotNull);
+    expect(controller.activeTarget, same(target));
+    expect(controller.activePayload, same(payload));
+    controller.tick(const Duration(milliseconds: 1));
+
+    expect(controller.currentAction, PetActionType.none);
+    expect(controller.state, PetState.idle);
+    expect(controller.bouncingToy, isNull);
+    expect(controller.activeTarget, same(target));
+    expect(controller.activePayload, same(payload));
+  });
+
+  test(
+    'inspection remains active immediately before its 2.8 second boundary',
+    () {
+      final controller = PetWorldController();
+      final target = _target(id: 'media');
+      final payload = <String, Object>{'media': 'gif-boundary'};
+
+      controller.startInspectGif(target, payload: payload);
+      controller.tick(const Duration(milliseconds: 2799));
+
+      expect(controller.currentAction, PetActionType.inspectGif);
+      expect(controller.activeTarget, same(target));
+      expect(controller.activePayload, same(payload));
+      controller.tick(const Duration(milliseconds: 1));
+
+      expect(controller.currentAction, PetActionType.none);
+      expect(controller.state, PetState.idle);
+      expect(controller.activeTarget, same(target));
+      expect(controller.activePayload, same(payload));
     },
   );
 
@@ -390,7 +560,11 @@ void main() {
       expect(controller.currentAction, PetActionType.observeTarget);
       controller.tick(const Duration(milliseconds: 1));
       expect(controller.currentAction, PetActionType.none);
+      expect(controller.state, PetState.idle);
       expect(controller.activeTarget, isNull);
+      expect(controller.activePayload, isNull);
+      controller.tick(const Duration(milliseconds: 601));
+      expect(controller.state, PetState.walk);
     },
   );
 
@@ -414,24 +588,35 @@ void main() {
     },
   );
 
-  test(
-    'large paw tick crosses both ordered platform impacts without random assertions',
-    () {
-      final controller = PetWorldController();
-      final target = _target();
+  test('paw impacts occur in order at their two timeline boundaries', () {
+    final controller = PetWorldController();
+    final target = _target();
 
-      controller.startPawTest(target);
-      controller.tick(const Duration(milliseconds: 2500));
+    controller.startPawTest(target);
+    controller.tick(const Duration(milliseconds: 1999));
 
-      expect(controller.currentAction, PetActionType.pawTest);
-      expect(controller.getBubbleDeflection(target.id), 0.0);
-      controller.tick(const Duration(milliseconds: 1));
-      expect(
-        controller.getBubbleDeflection(target.id),
-        closeTo(0.075306, 0.000001),
-      );
-    },
-  );
+    expect(controller.currentAction, PetActionType.pawTest);
+    expect(controller.getBubbleDeflection(target.id), 0.0);
+    expect(controller.springNotifier.value, 0);
+    controller.tick(const Duration(milliseconds: 1));
+    expect(controller.springNotifier.value, 1);
+    expect(controller.getBubbleDeflection(target.id), 0.0);
+    controller.tick(const Duration(milliseconds: 1));
+    expect(
+      controller.getBubbleDeflection(target.id),
+      closeTo(0.04401, 0.000001),
+    );
+    expect(controller.springNotifier.value, 2);
+
+    controller.tick(const Duration(milliseconds: 449));
+    expect(controller.springNotifier.value, 4);
+    expect(controller.getBubbleDeflection(target.id), 0.0);
+    controller.tick(const Duration(milliseconds: 1));
+    expect(
+      controller.getBubbleDeflection(target.id),
+      closeTo(0.031296, 0.000001),
+    );
+  });
 
   test(
     'geometry changes retarget a jump and removal clears its landed runtime',
@@ -474,4 +659,18 @@ PetMessageTarget _target({
     messageText: '$payload',
     sourceIdentity: sourceIdentity,
   )..markMeasuredBounds(const Rect.fromLTWH(100, 200, 180, 52));
+}
+
+PetMessageTarget _unmeasuredTarget({
+  required String id,
+  required ({String roomId, String clientId}) sourceIdentity,
+}) {
+  return PetMessageTarget(
+    id: id,
+    kind: WorldObjectKind.platform,
+    contentKind: PetNormalizedContentKind.text,
+    payload: 'hello',
+    messageText: 'hello',
+    sourceIdentity: sourceIdentity,
+  );
 }
