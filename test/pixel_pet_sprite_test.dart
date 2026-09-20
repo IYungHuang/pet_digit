@@ -1,6 +1,5 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_world.dart';
@@ -9,6 +8,13 @@ import 'package:chat_pet_mvp/pet/presentation/pixel_pet_sprite.dart';
 
 void main() {
   group('PixelPetSprite domain & assets', () {
+    test('visible comparison ignores RGB stored under transparent pixels', () {
+      final left = Uint8List.fromList([255, 0, 0, 0, 20, 30, 40, 255]);
+      final right = Uint8List.fromList([0, 255, 0, 0, 20, 30, 40, 255]);
+
+      expect(_visiblePixelsEqual(left, right), isTrue);
+    });
+
     testWidgets('corgi walk frames are valid and visibly distinct', (
       tester,
     ) async {
@@ -50,7 +56,7 @@ void main() {
       for (var left = 0; left < visibleFrames.length; left++) {
         for (var right = left + 1; right < visibleFrames.length; right++) {
           expect(
-            listEquals(visibleFrames[left], visibleFrames[right]),
+            _visiblePixelsEqual(visibleFrames[left], visibleFrames[right]),
             isFalse,
             reason: 'walk frames $left and $right must differ visibly',
           );
@@ -248,4 +254,19 @@ void main() {
       }
     });
   });
+}
+
+bool _visiblePixelsEqual(Uint8List left, Uint8List right) {
+  if (left.length != right.length || left.length % 4 != 0) return false;
+
+  for (var offset = 0; offset < left.length; offset += 4) {
+    final leftAlpha = left[offset + 3];
+    final rightAlpha = right[offset + 3];
+    if (leftAlpha == 0 && rightAlpha == 0) continue;
+
+    for (var channel = 0; channel < 4; channel++) {
+      if (left[offset + channel] != right[offset + channel]) return false;
+    }
+  }
+  return true;
 }
