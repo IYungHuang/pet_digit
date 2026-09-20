@@ -38,3 +38,24 @@ Handlers receive only `PetActionContext`. Runner validates exactly one factory p
 - `git diff --check`: PASS.
 
 No Flame dependency or presentation snapshot added. No push performed.
+
+## Fix round 1
+
+Base: `8e906751c7d0fd5763299f88e6514ce82bd3da07`
+
+### RED / GREEN
+
+- RED: `flutter test test/pet/pet_action_runner_test.dart` failed to compile because `PetActionRunner.previousTotalElapsed` and `previousPhaseElapsed` did not exist. New tests also specify stable pre-tick snapshots across `beginPhase`, completed-end cancellation exclusion, interruption cancellation, and retention cleanup.
+- GREEN: runner snapshots total/phase elapsed at each positive `advance`, preserves those values through same-tick phase reset, resets them at start/end, and exposes them directly through controller context. Natural completion skips `handler.cancel`; replaced, world reset, pet change, and target removal invoke it. Focused handler + runner suite passed 30 tests.
+- Handler coverage: direct fake narrow-context tests exercise all seven concrete handlers. Each covers start publication, key boundary/frame/effects, completion, and cancel stability. Dedicated cases cover ordered large-tick paw/dog/parrot impacts, live retargeting, observe phase reset, chase expired/caught paths, and jump surface/height/landing.
+
+### Verification
+
+- Focused handlers + runner: PASS, 30 tests.
+- Handlers + runner + characterization + both world suites + reconciliation: PASS, 119 tests.
+- Pet + both world + chat shell: PASS, 283 tests.
+- Full `flutter test`: PASS, 347 tests.
+- `flutter analyze`: PASS, no issues.
+- `git diff --check`: PASS.
+
+No push performed.

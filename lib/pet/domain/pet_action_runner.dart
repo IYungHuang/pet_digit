@@ -32,6 +32,8 @@ class PetActionRunner {
   Object? _payload;
   Duration _totalElapsed = Duration.zero;
   Duration _phaseElapsed = Duration.zero;
+  Duration _previousTotalElapsed = Duration.zero;
+  Duration _previousPhaseElapsed = Duration.zero;
   PetActionEndReason? _lastEndReason;
 
   PetActionPlan? get activePlan => _activePlan;
@@ -39,6 +41,8 @@ class PetActionRunner {
   Object? get payload => _payload;
   Duration get totalElapsed => _totalElapsed;
   Duration get phaseElapsed => _phaseElapsed;
+  Duration get previousTotalElapsed => _previousTotalElapsed;
+  Duration get previousPhaseElapsed => _previousPhaseElapsed;
   PetActionEndReason? get lastEndReason => _lastEndReason;
   PetActionHandler? get activeHandler => _handler;
 
@@ -60,6 +64,8 @@ class PetActionRunner {
     _payload = plan.payload;
     _totalElapsed = Duration.zero;
     _phaseElapsed = Duration.zero;
+    _previousTotalElapsed = Duration.zero;
+    _previousPhaseElapsed = Duration.zero;
     if (context != null) {
       _context = context;
       _handler = createHandler(plan.runtimeAction);
@@ -69,6 +75,8 @@ class PetActionRunner {
 
   void advance(Duration elapsed) {
     if (_activePlan == null || elapsed <= Duration.zero) return;
+    _previousTotalElapsed = _totalElapsed;
+    _previousPhaseElapsed = _phaseElapsed;
     _totalElapsed += elapsed;
     _phaseElapsed += elapsed;
   }
@@ -86,7 +94,9 @@ class PetActionRunner {
   void end(PetActionEndReason reason) {
     final handler = _handler;
     final context = _context;
-    if (handler != null && context != null) {
+    if (reason != PetActionEndReason.completed &&
+        handler != null &&
+        context != null) {
       handler.cancel(context, reason);
     }
     final action = _activePlan?.runtimeAction;
@@ -100,6 +110,8 @@ class PetActionRunner {
     if (!retention.payload) _payload = null;
     _totalElapsed = Duration.zero;
     _phaseElapsed = Duration.zero;
+    _previousTotalElapsed = Duration.zero;
+    _previousPhaseElapsed = Duration.zero;
     _lastEndReason = reason;
   }
 

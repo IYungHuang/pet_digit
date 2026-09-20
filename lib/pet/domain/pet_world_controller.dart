@@ -786,9 +786,9 @@ final class _PetWorldActionContext implements PetActionContext {
   @override
   Duration get phaseElapsed => world._actionRunner.phaseElapsed;
   @override
-  Duration get previousTotalElapsed => totalElapsed - world._lastActionTick;
+  Duration get previousTotalElapsed => world._actionRunner.previousTotalElapsed;
   @override
-  Duration get previousPhaseElapsed => phaseElapsed - world._lastActionTick;
+  Duration get previousPhaseElapsed => world._actionRunner.previousPhaseElapsed;
   @override
   Offset get position => world.position;
   @override
