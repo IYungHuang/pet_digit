@@ -1,4 +1,4 @@
-package com.example.chat_pet_mvp
+package com.iyunghuang.petdigitchat
 
 import io.flutter.embedding.android.FlutterActivity
 
