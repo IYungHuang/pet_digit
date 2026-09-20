@@ -270,6 +270,24 @@ void main() {
     },
   );
 
+  test('loading a room clears an interrupted jump projection', () {
+    final controller = PetWorldController();
+    controller.loadRoom(FakeChatRepository.rooms.first);
+    _measureTargets(controller);
+    final platform = controller.objects.firstWhere(
+      (object) => object.kind == WorldObjectKind.platform,
+    );
+
+    controller.interact(platform.id);
+    controller.tick(const Duration(milliseconds: 275));
+    expect(controller.heightAboveSurface, greaterThan(0));
+
+    controller.loadRoom(FakeChatRepository.rooms.last);
+
+    expect(controller.heightAboveSurface, 0);
+    expect(controller.currentSurfaceY, controller.position.dy + 52);
+  });
+
   test(
     'switching pets updates selectedPet, petConfig, and spawns signature particles',
     () {

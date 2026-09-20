@@ -7,6 +7,7 @@ import '../../chat/domain/chat_models.dart';
 import '../../chat/domain/chat_message.dart' as domain;
 import 'pet_action_plan.dart';
 import 'pet_action_runner.dart';
+import 'actions/pet_action_context.dart';
 import 'pet_behavior_catalog.dart';
 import 'pet_behavior_executor.dart';
 import 'pet_behavior_normalizer.dart';
@@ -39,6 +40,10 @@ class PetWorldController implements PetBehaviorRuntime {
   final Set<({String roomId, String clientId})> _seenMessageSources = {};
   double _time = 0;
   double _walkDirection = 1;
+  int _actionFrameIndex = 0;
+  double? _actionSurfaceY;
+  double _actionHeight = 0;
+  Duration _lastActionTick = Duration.zero;
   Size _viewportSize = Size.zero;
 
   double get direction => _walkDirection;
@@ -90,12 +95,7 @@ class PetWorldController implements PetBehaviorRuntime {
   /// During an airborne jump, this interpolates the projection surface plane.
   /// When on a message bubble platform, this incorporates real-time spring deflection.
   double get currentSurfaceY {
-    if (currentAction == PetActionType.jumpToPlatform) {
-      final progress = (_jumpTime / _jumpDuration).clamp(0.0, 1.0);
-      final startSurface = _jumpStart.dy + 52.0;
-      final targetSurface = _jumpTarget.dy + 52.0;
-      return startSurface + (targetSurface - startSurface) * progress;
-    }
+    if (_actionSurfaceY != null) return _actionSurfaceY!;
     if (currentPlatform != null) {
       return currentPlatform!.bounds.top +
           getBubbleDeflection(currentPlatform!.id);
@@ -105,11 +105,7 @@ class PetWorldController implements PetBehaviorRuntime {
 
   /// Height of the pet's feet above the surface during an airborne arc.
   double get heightAboveSurface {
-    if (currentAction == PetActionType.jumpToPlatform) {
-      final progress = (_jumpTime / _jumpDuration).clamp(0.0, 1.0);
-      return 4 * _jumpArcHeight * progress * (1.0 - progress);
-    }
-    return 0.0;
+    return _actionHeight;
   }
 
   // Bubble spring physics
@@ -124,40 +120,16 @@ class PetWorldController implements PetBehaviorRuntime {
     springNotifier.value++;
   }
 
-  // Jump interpolation
-  Offset _jumpStart = Offset.zero;
-  Offset _jumpTarget = Offset.zero;
-  double _jumpDuration = 0.55;
-  double _jumpTime = 0.0;
-  double _jumpArcHeight = 45.0;
-
   // Action target
   final PetActionRunner _actionRunner = PetActionRunner();
-  bool _walkTowardObservationTarget = false;
   double _dustTimer = 0.0;
   double _stepBounceTimer = 0.0;
-  Offset _pawTestStart = Offset.zero;
-  Offset _pawTestTarget = Offset.zero;
-  bool _pawTestUsesRightSide = false;
-  bool _pawTestFirstImpact = false;
-  bool _pawTestSecondImpact = false;
-  Offset _probeStart = Offset.zero;
-  bool _probeUsesRightSide = false;
-  bool _probeFirstImpact = false;
-  bool _probeSecondImpact = false;
-  bool _inspectUsesRightSide = false;
   _PendingStimulus? _pendingStimulus;
 
   PetInteractable? get activeTarget => _actionRunner.target;
   Object? get activePayload => _actionRunner.payload;
-  double get _actionElapsed =>
-      _actionRunner.totalElapsed.inMicroseconds /
-      Duration.microsecondsPerSecond;
-  double get _actionPhaseElapsed =>
-      _actionRunner.phaseElapsed.inMicroseconds /
-      Duration.microsecondsPerSecond;
-
   int get frameIndex {
+    if (currentAction != PetActionType.none) return _actionFrameIndex;
     switch (state) {
       case PetState.idle:
         return (_time / 0.25).floor() % 4;
@@ -173,40 +145,10 @@ class PetWorldController implements PetBehaviorRuntime {
       case PetState.catStalk:
         return (_time / 0.18).floor() % 4;
       case PetState.pawTest:
-        return _pawTestFrameIndex;
       case PetState.dogProbe:
-        return _dogProbeFrameIndex;
       case PetState.parrotProbe:
-        return _parrotProbeFrameIndex;
+        return _actionFrameIndex;
     }
-  }
-
-  int get _pawTestFrameIndex {
-    final elapsedMs = (_actionElapsed * 1000).round();
-    if (elapsedMs < 1850) return 0;
-    if (elapsedMs < 2000) return 1;
-    if (elapsedMs < 2150) return 2;
-    if (elapsedMs < 2300) return 3;
-    if (elapsedMs < 2450) return 4;
-    return 5;
-  }
-
-  int get _dogProbeFrameIndex {
-    if (_actionElapsed < 0.2) return 0;
-    if (_actionElapsed < 0.65) return 1;
-    if (_actionElapsed < 1.0) return 2;
-    if (_actionElapsed < 1.7) return 3;
-    if (_actionElapsed < 2.3) return 4;
-    return 5;
-  }
-
-  int get _parrotProbeFrameIndex {
-    if (_actionElapsed < 0.2) return 0;
-    if (_actionElapsed < 0.45) return 1;
-    if (_actionElapsed < 0.7) return 2;
-    if (_actionElapsed < 1.7) return 3;
-    if (_actionElapsed < 2.3) return 4;
-    return 5;
   }
 
   void loadRoom(ChatRoom room) {
@@ -222,7 +164,8 @@ class PetWorldController implements PetBehaviorRuntime {
     currentAction = PetActionType.none;
     currentPlatform = null;
     _actionRunner.end(PetActionEndReason.worldReset);
-    _walkTowardObservationTarget = false;
+    _actionSurfaceY = null;
+    _actionHeight = 0.0;
     _dustTimer = 0.0;
     _stepBounceTimer = 0.0;
     _pawStepTimer = 0.0;
@@ -351,9 +294,10 @@ class PetWorldController implements PetBehaviorRuntime {
     currentAction = PetActionType.none;
     state = PetState.idle;
     bouncingToy = null;
-    _walkTowardObservationTarget = false;
     _pendingStimulus = null;
     _time = 0;
+    _actionSurfaceY = null;
+    _actionHeight = 0;
   }
 
   void updateObjectBounds(Map<String, Rect> boundsMap) {
@@ -371,10 +315,6 @@ class PetWorldController implements PetBehaviorRuntime {
   }
 
   void _syncTargetGeometry() {
-    if (currentAction == PetActionType.jumpToPlatform &&
-        _actionRunner.target != null) {
-      _jumpTarget = _platformLandingPosition(_actionRunner.target!.bounds);
-    }
     if (currentPlatform != null) {
       final bounds = currentPlatform!.bounds;
       final maxBoundX = math.max(bounds.left + 4, bounds.right - 56).toDouble();
@@ -415,7 +355,8 @@ class PetWorldController implements PetBehaviorRuntime {
     if (dt <= 0) return;
 
     _time += dt;
-    _actionRunner.advance(Duration(milliseconds: elapsed.inMilliseconds));
+    _lastActionTick = Duration(milliseconds: elapsed.inMilliseconds);
+    _actionRunner.advance(_lastActionTick);
     _dustTimer += dt;
     _stepBounceTimer += dt;
 
@@ -451,31 +392,11 @@ class PetWorldController implements PetBehaviorRuntime {
     }
 
     // 4. Handle specific action sequence or default movement
-    switch (currentAction) {
-      case PetActionType.jumpToPlatform:
-        _tickJumpToPlatform(dt);
-        break;
-      case PetActionType.chaseEmoji:
-        _tickChaseEmoji(dt);
-        break;
-      case PetActionType.inspectGif:
-        _tickInspectGif(dt);
-        break;
-      case PetActionType.pawTest:
-        _tickPawTest(dt);
-        break;
-      case PetActionType.dogProbe:
-        _tickDogProbe(dt);
-        break;
-      case PetActionType.parrotProbe:
-        _tickParrotProbe(dt);
-        break;
-      case PetActionType.observeTarget:
-        _tickObserveTarget(dt);
-        break;
-      case PetActionType.none:
-        _tickDefaultPatrol(dt);
-        break;
+    final hadAction = currentAction != PetActionType.none;
+    if (hadAction) {
+      _actionRunner.tick(_PetWorldActionContext(this), _lastActionTick);
+    } else {
+      _tickDefaultPatrol(dt);
     }
   }
 
@@ -559,7 +480,10 @@ class PetWorldController implements PetBehaviorRuntime {
     _cancelActiveRuntimeArtifacts(platformImpulse: platformImpulse);
     _pendingStimulus = null;
     final liveTarget = _objectForId(target.id) ?? target;
-    _actionRunner.start(plan, liveTarget);
+    currentAction = _actionTypeFor(plan.runtimeAction);
+    _actionSurfaceY = null;
+    _actionHeight = 0;
+    _actionRunner.start(plan, liveTarget, _PetWorldActionContext(this));
     _time = 0.0;
     _dustTimer = 0.0;
     _stepBounceTimer = 0.0;
@@ -576,42 +500,18 @@ class PetWorldController implements PetBehaviorRuntime {
     final platformImpulse = plan.runtimeAction == PetRuntimeAction.chaseEmoji
         ? 70.0
         : 60.0;
-    final liveTarget = _beginRuntimeAction(
-      plan,
-      target,
-      platformImpulse: platformImpulse,
-    );
-
-    switch (plan.runtimeAction) {
-      case PetRuntimeAction.jumpToPlatform:
-        final boundedTarget = liveTarget is PetBoundedInteractable
-            ? liveTarget
-            : target is PetBoundedInteractable
-            ? target
-            : null;
-        assert(boundedTarget != null);
-        _startJumpToPlatform(boundedTarget!);
-        return;
-      case PetRuntimeAction.chaseEmoji:
-        _startChaseEmoji(liveTarget, payload: plan.payload);
-        return;
-      case PetRuntimeAction.inspectMedia:
-        _startInspectGif(liveTarget);
-        return;
-      case PetRuntimeAction.observeTarget:
-        _startObserveTarget(liveTarget, walkToward: plan.walkToward);
-        return;
-      case PetRuntimeAction.catPawTest:
-        _startPawTest(liveTarget);
-        return;
-      case PetRuntimeAction.dogProbe:
-        _startDogProbe(liveTarget);
-        return;
-      case PetRuntimeAction.parrotProbe:
-        _startParrotProbe(liveTarget);
-        return;
-    }
+    _beginRuntimeAction(plan, target, platformImpulse: platformImpulse);
   }
+
+  PetActionType _actionTypeFor(PetRuntimeAction action) => switch (action) {
+    PetRuntimeAction.jumpToPlatform => PetActionType.jumpToPlatform,
+    PetRuntimeAction.chaseEmoji => PetActionType.chaseEmoji,
+    PetRuntimeAction.inspectMedia => PetActionType.inspectGif,
+    PetRuntimeAction.observeTarget => PetActionType.observeTarget,
+    PetRuntimeAction.catPawTest => PetActionType.pawTest,
+    PetRuntimeAction.dogProbe => PetActionType.dogProbe,
+    PetRuntimeAction.parrotProbe => PetActionType.parrotProbe,
+  };
 
   void _validateActionTarget(PetActionPlan plan, PetInteractable target) {
     if (plan.runtimeAction != PetRuntimeAction.jumpToPlatform) return;
@@ -632,7 +532,6 @@ class PetWorldController implements PetBehaviorRuntime {
       currentPlatform = null;
     }
     bouncingToy = null;
-    _walkTowardObservationTarget = false;
   }
 
   // --- Platform Jump (Standing/Walking on Bubble with Spring Landing) ---
@@ -645,65 +544,6 @@ class PetWorldController implements PetBehaviorRuntime {
       ),
       target,
     );
-  }
-
-  void _startJumpToPlatform(PetBoundedInteractable target) {
-    currentAction = PetActionType.jumpToPlatform;
-    _jumpTarget = _platformLandingPosition(target.bounds);
-    _walkDirection = _jumpTarget.dx >= position.dx ? 1.0 : -1.0;
-    _jumpStart = position;
-    _jumpDuration = 0.55;
-    _jumpTime = 0.0;
-    _jumpArcHeight = math.max(
-      35.0,
-      (_jumpStart.dy - _jumpTarget.dy).abs() * 0.4 + 25.0,
-    );
-    state = PetState.jump;
-  }
-
-  Offset _platformLandingPosition(Rect bounds) {
-    final maxX = math.max(bounds.left + 4, bounds.right - 56).toDouble();
-    return Offset(
-      (bounds.center.dx - 32).clamp(bounds.left + 4, maxX),
-      bounds.top - 52,
-    );
-  }
-
-  void _tickJumpToPlatform(double dt) {
-    _jumpTime += dt;
-    final progress = (_jumpTime / _jumpDuration).clamp(0.0, 1.0);
-
-    // Parabolic trajectory
-    final linearX = _jumpStart.dx + (_jumpTarget.dx - _jumpStart.dx) * progress;
-    final linearY = _jumpStart.dy + (_jumpTarget.dy - _jumpStart.dy) * progress;
-    final arc = 4 * _jumpArcHeight * progress * (1.0 - progress);
-
-    position = Offset(linearX, linearY - arc);
-
-    if (progress >= 1.0) {
-      currentAction = PetActionType.none;
-      currentPlatform = _actionRunner.target as PetBoundedInteractable?;
-      _actionRunner.end(PetActionEndReason.completed);
-      state = PetState.idle;
-      _time = 0.0;
-
-      // IMPACT! Trigger downward spring oscillation on the message bubble
-      if (currentPlatform != null) {
-        triggerBubbleImpulse(currentPlatform!.id, 160.0);
-      }
-
-      position = Offset(
-        _jumpTarget.dx,
-        _jumpTarget.dy +
-            (currentPlatform != null
-                ? getBubbleDeflection(currentPlatform!.id)
-                : 0),
-      );
-
-      // Spawn landing dust puffs
-      _spawnDust(position.translate(16, 52));
-      _spawnDust(position.translate(40, 52));
-    }
   }
 
   // --- Emoji Chase (Video 2: Emoji Bouncing & Corgi Chasing) ---
@@ -719,73 +559,6 @@ class PetWorldController implements PetBehaviorRuntime {
     );
   }
 
-  void _startChaseEmoji(PetInteractable target, {required Object? payload}) {
-    currentAction = PetActionType.chaseEmoji;
-    state = PetState.pounce;
-
-    final bubbleCenter = target.bounds.center;
-    // Launch emoji away from current corgi side
-    final launchDirection = bubbleCenter.dx >= position.dx ? 1.0 : -1.0;
-    final groundY = math.max(position.dy + 70, target.bounds.bottom + 40);
-
-    bouncingToy = BouncingEmojiToy(
-      emoji: payload is String && payload.isNotEmpty ? payload : '👋',
-      start: bubbleCenter,
-      groundY: groundY,
-      direction: launchDirection,
-    );
-  }
-
-  void _tickChaseEmoji(double dt) {
-    if (bouncingToy == null || bouncingToy!.isFinished) {
-      currentAction = PetActionType.none;
-      state = PetState.idle;
-      _time = 0.0;
-      _actionRunner.end(PetActionEndReason.completed);
-      return;
-    }
-
-    final toy = bouncingToy!;
-    final targetX = (toy.position.dx - 32 * toy.direction).clamp(16.0, 310.0);
-    final targetY = toy.position.dy - 44;
-
-    final dx = targetX - position.dx;
-    final dy = targetY - position.dy;
-    final dist = math.sqrt(dx * dx + dy * dy);
-
-    if (dist > 15 && !toy.isCaught) {
-      // Running after emoji
-      state = PetState.run;
-      _walkDirection = dx >= 0 ? 1.0 : -1.0;
-      const speed = 190.0;
-      final moveX = (dx / dist) * speed * dt;
-      final moveY = (dy / dist) * speed * dt;
-
-      position = Offset(
-        (position.dx + moveX).clamp(16.0, 310.0),
-        (position.dy + moveY).clamp(16.0, 800.0),
-      );
-
-      // Dust puff trail while running (Video 2)
-      if (_dustTimer > 0.08) {
-        _dustTimer = 0.0;
-        _spawnDust(position.translate(direction > 0 ? 12 : 44, 52));
-      }
-      _handleFootsteps(dt, isRunning: true);
-    } else {
-      // Caught the emoji! Pounce & celebrate
-      toy.isCaught = true;
-      state = PetState.pounce;
-      if (_actionElapsed > 1.2) {
-        currentAction = PetActionType.none;
-        state = PetState.idle;
-        _time = 0.0;
-        bouncingToy = null;
-        _actionRunner.end(PetActionEndReason.completed);
-      }
-    }
-  }
-
   // --- GIF Observe (Video 1: Look up -> Hearts -> Approach -> Paw on Bubble) ---
   void startInspectGif(PetInteractable target, {required Object? payload}) {
     _startPlannedAction(
@@ -799,69 +572,6 @@ class PetWorldController implements PetBehaviorRuntime {
     );
   }
 
-  void _startInspectGif(PetInteractable target) {
-    _inspectUsesRightSide = _usesRightSideOf(target.bounds);
-    currentAction = PetActionType.inspectGif;
-    state = PetState.observe;
-  }
-
-  void _tickInspectGif(double dt) {
-    final target = _actionRunner.target;
-    if (target == null) {
-      currentAction = PetActionType.none;
-      state = PetState.idle;
-      _actionRunner.end(PetActionEndReason.targetRemoved);
-      return;
-    }
-
-    final targetPosition = _messageSidePosition(
-      target,
-      useRightSide: _inspectUsesRightSide,
-    );
-
-    if (_actionElapsed < 0.6) {
-      // Phase 1: Alert & watch with ears perked
-      state = PetState.observe;
-      _walkDirection = targetPosition.dx >= position.dx ? 1.0 : -1.0;
-    } else if (_actionElapsed < 1.2) {
-      // Phase 2: Excited tail wagging & floating hearts (Video 1)
-      state = PetState.observe;
-      if (_dustTimer > 0.25) {
-        _dustTimer = 0.0;
-        _spawnHeart(position.translate(32, 8));
-      }
-    } else if (_actionElapsed < 1.9) {
-      // Phase 3: Approach towards bottom of GIF bubble
-      state = PetState.run;
-      final dx = targetPosition.dx - position.dx;
-      final dy = targetPosition.dy - position.dy;
-      final dist = math.sqrt(dx * dx + dy * dy);
-      if (dist > 6) {
-        _walkDirection = dx >= 0 ? 1.0 : -1.0;
-        const speed = 140.0;
-        position = Offset(
-          position.dx + (dx / dist) * speed * dt,
-          position.dy + (dy / dist) * speed * dt,
-        );
-        _handleFootsteps(dt, isRunning: true);
-      }
-    } else if (_actionElapsed < 2.8) {
-      // Phase 4: Leap up with front paws resting on the bottom border of the GIF (Video 1 00:09)
-      state = PetState.pounce;
-      position = targetPosition;
-      if (_dustTimer > 0.2) {
-        _dustTimer = 0.0;
-        _spawnHeart(position.translate(20, -10));
-      }
-    } else {
-      // Phase 5: Complete sequence
-      currentAction = PetActionType.none;
-      state = PetState.idle;
-      _time = 0.0;
-      _actionRunner.end(PetActionEndReason.completed);
-    }
-  }
-
   void startPawTest(PetInteractable target) {
     _startPlannedAction(
       PetActionPlan(
@@ -871,88 +581,6 @@ class PetWorldController implements PetBehaviorRuntime {
       ),
       target,
     );
-  }
-
-  void _startPawTest(PetInteractable liveTarget) {
-    _pawTestStart = position;
-    _pawTestUsesRightSide = _usesRightSideOf(liveTarget.bounds);
-    _pawTestTarget = _messageSidePosition(
-      liveTarget,
-      useRightSide: _pawTestUsesRightSide,
-    );
-    _walkDirection = _pawTestTarget.dx >= position.dx ? 1.0 : -1.0;
-    _pawTestFirstImpact = false;
-    _pawTestSecondImpact = false;
-    currentAction = PetActionType.pawTest;
-    state = PetState.catStalk;
-  }
-
-  void _tickPawTest(double dt) {
-    final target = _actionRunner.target;
-    if (target == null) {
-      currentAction = PetActionType.none;
-      state = PetState.idle;
-      _actionRunner.end(PetActionEndReason.targetRemoved);
-      return;
-    }
-
-    _pawTestTarget = _messageSidePosition(
-      target,
-      useRightSide: _pawTestUsesRightSide,
-    );
-    final elapsedMs = (_actionElapsed * 1000).round();
-    final previousElapsedMs = ((_actionElapsed - dt) * 1000).round();
-    if (!_pawTestFirstImpact && previousElapsedMs < 2000 && elapsedMs >= 2000) {
-      _pawTestFirstImpact = true;
-      triggerBubbleImpulse(target.id, 45.0);
-    }
-    if (!_pawTestSecondImpact &&
-        previousElapsedMs < 2450 &&
-        elapsedMs >= 2450) {
-      _pawTestSecondImpact = true;
-      triggerBubbleImpulse(target.id, 32.0);
-    }
-    final firstStop = Offset.lerp(_pawTestStart, _pawTestTarget, 0.35)!;
-    if (_actionElapsed < 0.55) {
-      position = _pawTestStart;
-      state = PetState.catStalk;
-      return;
-    }
-    if (_actionElapsed < 1.0) {
-      final progress = _easeInOut((_actionElapsed - 0.55) / 0.45);
-      final movementDx = _pawTestTarget.dx - position.dx;
-      if (movementDx.abs() > 0.001) {
-        _walkDirection = movementDx.isNegative ? -1.0 : 1.0;
-      }
-      position = Offset.lerp(_pawTestStart, firstStop, progress)!;
-      state = PetState.catStalk;
-      _handleFootsteps(dt, isRunning: false);
-      return;
-    }
-    if (_actionElapsed < 1.3) {
-      position = firstStop;
-      state = PetState.catStalk;
-      return;
-    }
-    if (_actionElapsed < 1.7) {
-      final progress = _easeInOut((_actionElapsed - 1.3) / 0.4);
-      position = Offset.lerp(firstStop, _pawTestTarget, progress)!;
-      state = PetState.catStalk;
-      _handleFootsteps(dt, isRunning: false);
-      return;
-    }
-
-    position = _pawTestTarget;
-    _walkDirection = _pawTestUsesRightSide ? -1.0 : 1.0;
-    if (_actionElapsed < 3.0) {
-      state = PetState.pawTest;
-      return;
-    }
-
-    currentAction = PetActionType.none;
-    state = PetState.idle;
-    _time = 0.0;
-    _actionRunner.end(PetActionEndReason.completed);
   }
 
   bool _usesRightSideOf(Rect bounds) {
@@ -1001,53 +629,6 @@ class PetWorldController implements PetBehaviorRuntime {
     );
   }
 
-  void _startDogProbe(PetInteractable liveTarget) {
-    _startSpeciesProbe(liveTarget);
-    currentAction = PetActionType.dogProbe;
-    state = PetState.dogProbe;
-  }
-
-  void _tickDogProbe(double dt) {
-    final target = _actionRunner.target;
-    if (target == null) {
-      currentAction = PetActionType.none;
-      state = PetState.idle;
-      _actionRunner.end(PetActionEndReason.targetRemoved);
-      return;
-    }
-    final targetPosition = _messageSidePosition(
-      target,
-      useRightSide: _probeUsesRightSide,
-    );
-    final elapsedMs = (_actionElapsed * 1000).round();
-    final previousElapsedMs = ((_actionElapsed - dt) * 1000).round();
-    if (!_probeFirstImpact && previousElapsedMs < 1700 && elapsedMs >= 1700) {
-      _probeFirstImpact = true;
-      triggerBubbleImpulse(target.id, 24.0);
-    }
-    if (!_probeSecondImpact && previousElapsedMs < 2300 && elapsedMs >= 2300) {
-      _probeSecondImpact = true;
-      triggerBubbleImpulse(target.id, 18.0);
-    }
-    if (_actionElapsed < 0.2) {
-      position = _probeStart;
-    } else if (_actionElapsed < 1.0) {
-      final progress = _easeInOut((_actionElapsed - 0.2) / 0.8);
-      final base = Offset.lerp(_probeStart, targetPosition, progress)!;
-      position = base.translate(0, -math.sin(math.pi * progress) * 18);
-      _walkDirection = targetPosition.dx >= _probeStart.dx ? 1.0 : -1.0;
-    } else {
-      position = targetPosition;
-      _walkDirection = _probeUsesRightSide ? -1.0 : 1.0;
-    }
-    state = PetState.dogProbe;
-    if (_actionElapsed >= 2.8) {
-      currentAction = PetActionType.none;
-      state = PetState.idle;
-      _actionRunner.end(PetActionEndReason.completed);
-    }
-  }
-
   void startParrotProbe(PetInteractable target) {
     _startPlannedAction(
       PetActionPlan(
@@ -1057,69 +638,6 @@ class PetWorldController implements PetBehaviorRuntime {
       ),
       target,
     );
-  }
-
-  void _startParrotProbe(PetInteractable liveTarget) {
-    _startSpeciesProbe(liveTarget);
-    currentAction = PetActionType.parrotProbe;
-    state = PetState.parrotProbe;
-  }
-
-  void _tickParrotProbe(double dt) {
-    final target = _actionRunner.target;
-    if (target == null) {
-      currentAction = PetActionType.none;
-      state = PetState.idle;
-      _actionRunner.end(PetActionEndReason.targetRemoved);
-      return;
-    }
-    final targetPosition = _messageSidePosition(
-      target,
-      useRightSide: _probeUsesRightSide,
-    );
-    final elapsedMs = (_actionElapsed * 1000).round();
-    final previousElapsedMs = ((_actionElapsed - dt) * 1000).round();
-    if (!_probeFirstImpact && previousElapsedMs < 1700 && elapsedMs >= 1700) {
-      _probeFirstImpact = true;
-      triggerBubbleImpulse(target.id, 20.0);
-    }
-    if (!_probeSecondImpact && previousElapsedMs < 2300 && elapsedMs >= 2300) {
-      _probeSecondImpact = true;
-      triggerBubbleImpulse(target.id, 14.0);
-    }
-    if (_actionElapsed < 0.2) {
-      position = _probeStart;
-    } else if (_actionElapsed < 0.7) {
-      final progress = _easeInOut((_actionElapsed - 0.2) / 0.5);
-      position = Offset.lerp(_probeStart, targetPosition, progress)!;
-      _walkDirection = targetPosition.dx >= _probeStart.dx ? 1.0 : -1.0;
-    } else {
-      position = targetPosition;
-      _walkDirection = _probeUsesRightSide ? -1.0 : 1.0;
-    }
-    state = PetState.parrotProbe;
-    if (_actionElapsed >= 2.7) {
-      currentAction = PetActionType.none;
-      state = PetState.idle;
-      _actionRunner.end(PetActionEndReason.completed);
-    }
-  }
-
-  void _startSpeciesProbe(PetInteractable target) {
-    _probeStart = position;
-    _probeUsesRightSide = _usesRightSideOf(target.bounds);
-    _probeFirstImpact = false;
-    _probeSecondImpact = false;
-    final targetPosition = _messageSidePosition(
-      target,
-      useRightSide: _probeUsesRightSide,
-    );
-    _walkDirection = targetPosition.dx >= position.dx ? 1.0 : -1.0;
-  }
-
-  double _easeInOut(double value) {
-    final t = value.clamp(0.0, 1.0);
-    return t * t * (3 - 2 * t);
   }
 
   void startObserveTarget(PetInteractable target, {required bool walkToward}) {
@@ -1132,62 +650,6 @@ class PetWorldController implements PetBehaviorRuntime {
       ),
       target,
     );
-  }
-
-  void _startObserveTarget(PetInteractable target, {required bool walkToward}) {
-    currentAction = PetActionType.observeTarget;
-    _walkTowardObservationTarget = walkToward;
-    state = walkToward ? PetState.walk : PetState.observe;
-  }
-
-  void _tickObserveTarget(double dt) {
-    final target = _actionRunner.target;
-    if (target == null) {
-      currentAction = PetActionType.none;
-      state = PetState.idle;
-      _actionRunner.end(PetActionEndReason.targetRemoved);
-      return;
-    }
-    if (!_walkTowardObservationTarget) {
-      state = PetState.observe;
-      if (_actionPhaseElapsed >= 0.9) {
-        currentAction = PetActionType.none;
-        state = PetState.idle;
-        _actionRunner.end(PetActionEndReason.completed);
-      }
-      return;
-    }
-
-    final targetPosition = _messageSidePosition(
-      target,
-      useRightSide: _usesRightSideOf(target.bounds),
-    );
-    final dx = targetPosition.dx - position.dx;
-    final dy = targetPosition.dy - position.dy;
-    final distance = math.sqrt(dx * dx + dy * dy);
-    if (distance <= 12) {
-      _walkTowardObservationTarget = false;
-      state = PetState.observe;
-      _actionRunner.beginPhase();
-      return;
-    }
-
-    state = PetState.walk;
-    _walkDirection = dx >= 0 ? 1.0 : -1.0;
-    const speed = 90.0;
-    final step = speed * dt;
-    if (step >= distance) {
-      position = targetPosition;
-      _walkTowardObservationTarget = false;
-      state = PetState.observe;
-      _actionRunner.beginPhase();
-      return;
-    }
-    position = Offset(
-      position.dx + (dx / distance) * step,
-      position.dy + (dy / distance) * step,
-    );
-    _handleFootsteps(dt, isRunning: false);
   }
 
   // --- Default Patrol (Walk / Idle on floor or bubble surface) ---
@@ -1311,6 +773,88 @@ class PetWorldController implements PetBehaviorRuntime {
         initialSize: 14.0,
       ),
     );
+  }
+}
+
+final class _PetWorldActionContext implements PetActionContext {
+  _PetWorldActionContext(this.world);
+  final PetWorldController world;
+  @override
+  PetInteractable? get target => world._actionRunner.target;
+  @override
+  Duration get totalElapsed => world._actionRunner.totalElapsed;
+  @override
+  Duration get phaseElapsed => world._actionRunner.phaseElapsed;
+  @override
+  Duration get previousTotalElapsed => totalElapsed - world._lastActionTick;
+  @override
+  Duration get previousPhaseElapsed => phaseElapsed - world._lastActionTick;
+  @override
+  Offset get position => world.position;
+  @override
+  set position(Offset value) => world.position = value;
+  @override
+  PetState get state => world.state;
+  @override
+  set state(PetState value) => world.state = value;
+  @override
+  double get direction => world._walkDirection;
+  @override
+  set direction(double value) => world._walkDirection = value;
+  @override
+  set frameIndex(int value) => world._actionFrameIndex = value;
+  @override
+  Size get viewportSize => world._viewportSize;
+  @override
+  PetBoundedInteractable? get currentPlatform => world.currentPlatform;
+  @override
+  set currentPlatform(PetBoundedInteractable? value) =>
+      world.currentPlatform = value;
+  @override
+  double get currentSurfaceY => world.currentSurfaceY;
+  @override
+  set currentSurfaceY(double value) => world._actionSurfaceY = value;
+  @override
+  double get heightAboveSurface => world.heightAboveSurface;
+  @override
+  set heightAboveSurface(double value) => world._actionHeight = value;
+  @override
+  BouncingEmojiToy? get toy => world.bouncingToy;
+  @override
+  set toy(BouncingEmojiToy? value) => world.bouncingToy = value;
+  @override
+  double get dustTimer => world._dustTimer;
+  @override
+  set dustTimer(double value) => world._dustTimer = value;
+  @override
+  Offset messageSidePosition(
+    PetInteractable target, {
+    required bool useRightSide,
+  }) => world._messageSidePosition(target, useRightSide: useRightSide);
+  @override
+  bool usesRightSideOf(Rect bounds) => world._usesRightSideOf(bounds);
+  @override
+  double bubbleDeflection(String id) => world.getBubbleDeflection(id);
+  @override
+  void bubbleImpulse(String id, double force) =>
+      world.triggerBubbleImpulse(id, force);
+  @override
+  void footsteps(Duration elapsed, {required bool isRunning}) => world
+      ._handleFootsteps(elapsed.inMilliseconds / 1000, isRunning: isRunning);
+  @override
+  void spawnDust(Offset position) => world._spawnDust(position);
+  @override
+  void spawnHeart(Offset position) => world._spawnHeart(position);
+  @override
+  void beginPhase() => world._actionRunner.beginPhase();
+  @override
+  void resetPatrolClock() => world._time = 0;
+  @override
+  void complete([PetActionEndReason reason = PetActionEndReason.completed]) {
+    world.currentAction = PetActionType.none;
+    world._actionSurfaceY = null;
+    world._actionHeight = 0;
+    world._actionRunner.end(reason);
   }
 }
 
