@@ -61,6 +61,15 @@ staging build fails closed instead of silently falling back to fake.
    successful retry connects the room; a denied retry preserves whatever
    projection was already on screen.
 
+**The client-side membership gate above is not the access boundary.** It only
+improves UX (showing a clear "waiting for membership" banner instead of a
+broken chat) and fails closed on the client if it's ever bypassed or racy. The
+actual access boundary for room data is server-side: Firestore Security Rules
+(not in this repository) plus App Check enforcement, both owned and deployed
+by the backend team. Neither is part of this branch's scope — seeding a
+membership document unlocks the client UI, but real protection depends on the
+backend having equivalent rules deployed and enforced.
+
 This task never deploys Functions. Deployment is a separate, explicitly
 authorized step.
 

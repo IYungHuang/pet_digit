@@ -9,6 +9,10 @@ and Anonymous Auth bootstrap, and a Firestore-backed membership gate on every
 staging room read/write/stream. This report covers Task 6's local
 verification gate. No Cloud Functions were deployed by this work.
 
+Note: the client-side membership gate is UX plus a client-side fail-safe, not
+the access boundary — real enforcement is server-side Firestore Security
+Rules and App Check, owned by the backend and out of this branch's scope.
+
 ## Automated gate
 
 ```bash
