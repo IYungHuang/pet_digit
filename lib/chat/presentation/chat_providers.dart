@@ -32,6 +32,45 @@ typedef SendMessage =
       void Function(double progress)? onUploadProgress,
     });
 
+/// Membership-gated access state for staging chat rooms. Fake and emulator
+/// transports never require a membership probe and stay [notRequired].
+enum StagingMembershipStatus { notRequired, waiting, checking, ready, denied }
+
+/// Verifies that the current Firebase user has active membership in
+/// `rooms/{roomId}/members/{uid}`. Throws when access is not granted.
+typedef RoomMembershipProbe = Future<void> Function(String roomId);
+
+/// Drives the staging room access state machine: `waiting` until the caller
+/// requests [verify], `checking` while the probe runs, then `ready` or
+/// `denied` depending on the probe result. Never marks `ready` before the
+/// probe has actually succeeded.
+class StagingMembershipController
+    extends StateNotifier<StagingMembershipStatus> {
+  StagingMembershipController({
+    required StagingMembershipStatus initialState,
+    required RoomMembershipProbe probe,
+  }) : _probe = probe,
+       super(initialState);
+
+  final RoomMembershipProbe _probe;
+
+  /// Runs the membership probe for [roomId]. Returns `true` only once state
+  /// has become [StagingMembershipStatus.ready]; any failure (permission
+  /// denied, missing/inactive membership, or any other error) transitions to
+  /// [StagingMembershipStatus.denied] and returns `false`.
+  Future<bool> verify(String roomId) async {
+    state = StagingMembershipStatus.checking;
+    try {
+      await _probe(roomId);
+      state = StagingMembershipStatus.ready;
+      return true;
+    } catch (_) {
+      state = StagingMembershipStatus.denied;
+      return false;
+    }
+  }
+}
+
 final firebaseEnvironmentProvider = Provider<FirebaseEnvironment>(
   (ref) => FirebaseEnvironment.fromDartDefine(),
 );
@@ -68,6 +107,56 @@ final chatEventSourceProvider = Provider<MessageEventSource>((ref) {
 final useBackendTransportProvider = Provider<bool>((ref) {
   return ref.watch(firebaseEnvironmentProvider).usesBackendTransport;
 });
+
+/// Reads `rooms/{roomId}/members/{currentUid}` and succeeds only when the
+/// document exists with `active == true`. Outside staging this is a no-op:
+/// the controller never needs to call it because it starts `notRequired`.
+final roomMembershipProbeProvider = Provider<RoomMembershipProbe>((ref) {
+  final environment = ref.watch(firebaseEnvironmentProvider);
+  if (environment.mode != FirebaseEnvironmentMode.staging) {
+    return (_) async {};
+  }
+  final firestore = ref.watch(firebaseFirestoreProvider);
+  final auth = ref.watch(firebaseAuthProvider);
+  if (firestore == null || auth == null) {
+    throw StateError('Staging Firebase providers are unavailable');
+  }
+  return (roomId) async {
+    final uid = auth.currentUser?.uid;
+    if (uid == null) throw StateError('Staging user is not authenticated');
+    final member = await firestore.doc('rooms/$roomId/members/$uid').get();
+    if (!member.exists || member.data()?['active'] != true) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+        message: 'Active room membership is required',
+      );
+    }
+  };
+});
+
+final stagingMembershipControllerProvider =
+    StateNotifierProvider<StagingMembershipController, StagingMembershipStatus>(
+      (ref) {
+        final environment = ref.watch(firebaseEnvironmentProvider);
+        return StagingMembershipController(
+          initialState: environment.mode == FirebaseEnvironmentMode.staging
+              ? StagingMembershipStatus.waiting
+              : StagingMembershipStatus.notRequired,
+          probe: ref.watch(roomMembershipProbeProvider),
+        );
+      },
+    );
+
+/// True once staging room access has been proven (or is not required, i.e.
+/// fake/emulator transports). Reads the controller state as a snapshot: a
+/// later denial does not retroactively tear down providers built while
+/// access was allowed — callers must explicitly invalidate on success.
+bool _roomAccessAllowed(Ref ref) {
+  final status = ref.read(stagingMembershipControllerProvider);
+  return status == StagingMembershipStatus.ready ||
+      status == StagingMembershipStatus.notRequired;
+}
 
 final backendEventSourceProvider = Provider<MessageEventSource>((ref) {
   final firestore = ref.watch(firebaseFirestoreProvider);
@@ -140,11 +229,16 @@ final backendWebSocketUriProvider = Provider<Uri>(
 
 final messageConnectionStateProvider =
     StreamProvider.autoDispose<MessageConnectionState>((ref) async* {
+      if (!_roomAccessAllowed(ref)) {
+        yield MessageConnectionState.disconnected;
+        return;
+      }
       final source = ref.watch(chatEventSourceProvider);
       yield* source.connectionStates();
     });
 
 final chatConnectionProvider = FutureProvider.autoDispose<void>((ref) async {
+  if (!_roomAccessAllowed(ref)) return;
   final repository = ref.watch(chatRepositoryProvider);
   await repository.connect();
   ref.onDispose(() => unawaited(repository.disconnect()));
@@ -152,6 +246,7 @@ final chatConnectionProvider = FutureProvider.autoDispose<void>((ref) async {
 
 final roomMessagesProvider = StreamProvider.autoDispose
     .family<List<ChatMessage>, String>((ref, roomId) async* {
+      if (!_roomAccessAllowed(ref)) return;
       final repository = ref.watch(chatRepositoryProvider);
       final source = ref.watch(chatEventSourceProvider);
       if (source is FirebaseMessageEventSource) {
@@ -165,10 +260,15 @@ final roomMessagesProvider = StreamProvider.autoDispose
     });
 
 final messageDeltaProvider = StreamProvider.autoDispose<MessageDelta>((ref) {
+  if (!_roomAccessAllowed(ref)) return const Stream<MessageDelta>.empty();
   return ref.watch(chatRepositoryProvider).watchDeltas();
 });
 
 final sendMessageProvider = Provider<SendMessage>((ref) {
+  if (!_roomAccessAllowed(ref)) {
+    return (draft, {onUploadProgress}) =>
+        Future<ChatMessage>.error(StateError('Room membership is not ready'));
+  }
   final repository = ref.watch(chatRepositoryProvider);
   return (draft, {onUploadProgress}) =>
       repository.send(draft, onUploadProgress: onUploadProgress);

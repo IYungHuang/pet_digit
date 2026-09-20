@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -477,6 +478,293 @@ void main() {
     expect(composerTop - lastBottom, lessThan(100));
   });
 
+  testWidgets(
+    'shows waiting membership banner with uid and disables composer',
+    (tester) async {
+      final events = FakeMessageEventSource();
+      final repository = FakeMessageRepository(
+        remote: FakeMessageRemoteDataSource(),
+        upload: FakeMediaUploadDataSource(),
+        events: events,
+      );
+      addTearDown(repository.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            chatEventSourceProvider.overrideWithValue(events),
+            chatRepositoryProvider.overrideWithValue(repository),
+            firebaseAuthProvider.overrideWithValue(
+              _FakeFirebaseAuth(_FakeUser('uid-waiting')),
+            ),
+            stagingMembershipControllerProvider.overrideWith(
+              (ref) => StagingMembershipController(
+                initialState: StagingMembershipStatus.waiting,
+                probe: (_) async {},
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: ChatShell()),
+        ),
+      );
+      await _pumpChat(tester);
+
+      expect(find.textContaining('uid-waiting'), findsOneWidget);
+      final retryButton = tester.widget<TextButton>(
+        find.widgetWithText(TextButton, 'Retry'),
+      );
+      expect(retryButton.onPressed, isNotNull);
+
+      final textField = tester.widget<TextField>(find.byType(TextField));
+      expect(textField.enabled, isFalse);
+      final attachmentButton = tester.widget<IconButton>(
+        find.ancestor(
+          of: find.byIcon(Icons.add_circle_outline),
+          matching: find.byType(IconButton),
+        ),
+      );
+      expect(attachmentButton.onPressed, isNull);
+      final sendButton = tester.widget<IconButton>(
+        find.ancestor(
+          of: find.byIcon(Icons.send_rounded),
+          matching: find.byType(IconButton),
+        ),
+      );
+      expect(sendButton.onPressed, isNull);
+    },
+  );
+
+  testWidgets('shows checking membership banner with retry disabled', (
+    tester,
+  ) async {
+    final events = FakeMessageEventSource();
+    final repository = FakeMessageRepository(
+      remote: FakeMessageRemoteDataSource(),
+      upload: FakeMediaUploadDataSource(),
+      events: events,
+    );
+    addTearDown(repository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatEventSourceProvider.overrideWithValue(events),
+          chatRepositoryProvider.overrideWithValue(repository),
+          firebaseAuthProvider.overrideWithValue(
+            _FakeFirebaseAuth(_FakeUser('uid-checking')),
+          ),
+          stagingMembershipControllerProvider.overrideWith(
+            (ref) => StagingMembershipController(
+              initialState: StagingMembershipStatus.checking,
+              probe: (_) async {},
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: ChatShell()),
+      ),
+    );
+    await _pumpChat(tester);
+
+    expect(find.textContaining('uid-checking'), findsOneWidget);
+    final retryButton = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, 'Retry'),
+    );
+    expect(retryButton.onPressed, isNull);
+  });
+
+  testWidgets('shows denied membership banner with retry enabled', (
+    tester,
+  ) async {
+    final events = FakeMessageEventSource();
+    final repository = FakeMessageRepository(
+      remote: FakeMessageRemoteDataSource(),
+      upload: FakeMediaUploadDataSource(),
+      events: events,
+    );
+    addTearDown(repository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatEventSourceProvider.overrideWithValue(events),
+          chatRepositoryProvider.overrideWithValue(repository),
+          firebaseAuthProvider.overrideWithValue(
+            _FakeFirebaseAuth(_FakeUser('uid-denied')),
+          ),
+          stagingMembershipControllerProvider.overrideWith(
+            (ref) => StagingMembershipController(
+              initialState: StagingMembershipStatus.denied,
+              probe: (_) async {},
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: ChatShell()),
+      ),
+    );
+    await _pumpChat(tester);
+
+    expect(find.textContaining('uid-denied'), findsOneWidget);
+    final retryButton = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, 'Retry'),
+    );
+    expect(retryButton.onPressed, isNotNull);
+    final textField = tester.widget<TextField>(find.byType(TextField));
+    expect(textField.enabled, isFalse);
+  });
+
+  testWidgets('hides membership banner and enables composer when ready', (
+    tester,
+  ) async {
+    final events = FakeMessageEventSource();
+    final repository = FakeMessageRepository(
+      remote: FakeMessageRemoteDataSource(),
+      upload: FakeMediaUploadDataSource(),
+      events: events,
+    );
+    addTearDown(repository.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatEventSourceProvider.overrideWithValue(events),
+          chatRepositoryProvider.overrideWithValue(repository),
+          firebaseAuthProvider.overrideWithValue(
+            _FakeFirebaseAuth(_FakeUser('uid-ready')),
+          ),
+          stagingMembershipControllerProvider.overrideWith(
+            (ref) => StagingMembershipController(
+              initialState: StagingMembershipStatus.ready,
+              probe: (_) async {},
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: ChatShell()),
+      ),
+    );
+    await _pumpChat(tester);
+
+    expect(find.text('Retry'), findsNothing);
+    final textField = tester.widget<TextField>(find.byType(TextField));
+    expect(textField.enabled, isTrue);
+  });
+
+  testWidgets(
+    'tapping retry verifies membership and unlocks composer on success',
+    (tester) async {
+      final events = FakeMessageEventSource();
+      final repository = FakeMessageRepository(
+        remote: FakeMessageRemoteDataSource(latency: Duration.zero),
+        upload: FakeMediaUploadDataSource(latency: Duration.zero),
+        events: events,
+      );
+      addTearDown(repository.dispose);
+      var allow = false;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            chatEventSourceProvider.overrideWithValue(events),
+            chatRepositoryProvider.overrideWithValue(repository),
+            firebaseAuthProvider.overrideWithValue(
+              _FakeFirebaseAuth(_FakeUser('uid-retry')),
+            ),
+            stagingMembershipControllerProvider.overrideWith(
+              (ref) => StagingMembershipController(
+                initialState: StagingMembershipStatus.waiting,
+                probe: (_) async {
+                  if (!allow) {
+                    throw FirebaseException(
+                      plugin: 'cloud_firestore',
+                      code: 'permission-denied',
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: ChatShell()),
+        ),
+      );
+      await _pumpChat(tester);
+
+      var textField = tester.widget<TextField>(find.byType(TextField));
+      expect(textField.enabled, isFalse);
+
+      allow = true;
+      await tester.tap(find.widgetWithText(TextButton, 'Retry'));
+      await tester.pump();
+      await _pumpChat(tester);
+
+      expect(find.text('Retry'), findsNothing);
+      textField = tester.widget<TextField>(find.byType(TextField));
+      expect(textField.enabled, isTrue);
+    },
+  );
+
+  testWidgets('denied re-verification preserves the current room projection', (
+    tester,
+  ) async {
+    final events = FakeMessageEventSource();
+    final repository = FakeMessageRepository(
+      remote: FakeMessageRemoteDataSource(latency: Duration.zero),
+      upload: FakeMediaUploadDataSource(latency: Duration.zero),
+      events: events,
+    );
+    repository.seedMessages([
+      ChatMessage(
+        clientId: 'seed-kept',
+        serverId: 'seed-kept',
+        roomId: 'friends',
+        senderId: 'Mina',
+        content: const MessageContent.text(text: 'kept message'),
+        status: MessageDeliveryStatus.sent,
+        createdAt: DateTime(2026, 9, 19),
+      ),
+    ]);
+    addTearDown(repository.dispose);
+
+    final container = ProviderContainer(
+      overrides: [
+        chatEventSourceProvider.overrideWithValue(events),
+        chatRepositoryProvider.overrideWithValue(repository),
+        firebaseAuthProvider.overrideWithValue(
+          _FakeFirebaseAuth(_FakeUser('uid-preserve')),
+        ),
+        stagingMembershipControllerProvider.overrideWith(
+          (ref) => StagingMembershipController(
+            initialState: StagingMembershipStatus.ready,
+            probe: (_) async => throw FirebaseException(
+              plugin: 'cloud_firestore',
+              code: 'permission-denied',
+            ),
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: ChatShell()),
+      ),
+    );
+    await _pumpChat(tester);
+
+    expect(find.text('kept message'), findsOneWidget);
+
+    final result = await container
+        .read(stagingMembershipControllerProvider.notifier)
+        .verify('friends');
+    expect(result, isFalse);
+    await tester.pump();
+    await _pumpChat(tester);
+
+    expect(find.text('kept message'), findsOneWidget);
+    final textField = tester.widget<TextField>(find.byType(TextField));
+    expect(textField.enabled, isFalse);
+  });
+
   testWidgets('tapping preview button on media card opens ImagePreviewDialog', (
     tester,
   ) async {
@@ -526,4 +814,30 @@ double _bubbleTranslationY(WidgetTester tester, Finder bubble) {
       .map((element) => element.widget as Transform)
       .firstWhere((transform) => transform.alignment == null);
   return transform.transform.storage[13];
+}
+
+/// Minimal [User] fake exposing only [uid]; every other member forwards to
+/// [noSuchMethod] since tests never touch them.
+class _FakeUser implements User {
+  _FakeUser(this.uid);
+
+  @override
+  final String uid;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Minimal [FirebaseAuth] fake exposing only [currentUser], avoiding a real
+/// Firebase app in widget tests that need a staging-shaped auth provider.
+class _FakeFirebaseAuth implements FirebaseAuth {
+  _FakeFirebaseAuth(this._user);
+
+  final User _user;
+
+  @override
+  User get currentUser => _user;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

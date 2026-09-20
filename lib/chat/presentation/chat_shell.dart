@@ -277,6 +277,17 @@ class _ChatShellState extends ConsumerState<ChatShell> {
     unawaited(ref.read(chatRepositoryProvider).reconnect());
   }
 
+  Future<void> _retryMembership() async {
+    final controller = ref.read(stagingMembershipControllerProvider.notifier);
+    final success = await controller.verify(_activeRoomId);
+    if (!success || !mounted) return;
+    ref.invalidate(roomMessagesProvider(_activeRoomId));
+    ref.invalidate(chatConnectionProvider);
+    ref.invalidate(messageDeltaProvider);
+    ref.invalidate(messageConnectionStateProvider);
+    ref.invalidate(sendMessageProvider);
+  }
+
   void _retry(ChatMessage message) {
     if (!_retryingClientIds.add(message.clientId)) return;
     setState(() {});
@@ -327,6 +338,11 @@ class _ChatShellState extends ConsumerState<ChatShell> {
     });
     final messageState = ref.watch(roomMessagesProvider(_activeRoomId));
     final connectionState = ref.watch(messageConnectionStateProvider);
+    final membershipStatus = ref.watch(stagingMembershipControllerProvider);
+    final membershipUid = ref.watch(firebaseAuthProvider)?.currentUser?.uid;
+    final roomAccessReady =
+        membershipStatus == StagingMembershipStatus.ready ||
+        membershipStatus == StagingMembershipStatus.notRequired;
     final messages = messageState.asData?.value;
     if (messages != null) {
       _world.setMessageBubbleTargets(messages, roomId: _activeRoomId);
@@ -396,6 +412,11 @@ class _ChatShellState extends ConsumerState<ChatShell> {
             rooms: _rooms,
             activeRoomId: _activeRoomId,
             onSelected: _selectRoom,
+          ),
+          _MembershipBanner(
+            status: membershipStatus,
+            uid: membershipUid,
+            onRetry: _retryMembership,
           ),
           _ConnectionBanner(state: connectionState, onReconnect: _reconnect),
           Expanded(
@@ -477,12 +498,76 @@ class _ChatShellState extends ConsumerState<ChatShell> {
         color: Theme.of(context).scaffoldBackgroundColor,
         child: _MessageComposer(
           controller: _composerController,
+          enabled: roomAccessReady,
           onSend: _sendText,
           onAttachment: _sendDemoMedia,
           onPickedMedia: _sendPickedMedia,
           onError: (msg) => _showFeedback(msg, isError: true),
           showDemoAttachments: widget.showDemoAttachments,
         ),
+      ),
+    );
+  }
+}
+
+class _MembershipBanner extends StatelessWidget {
+  const _MembershipBanner({
+    required this.status,
+    required this.uid,
+    required this.onRetry,
+  });
+
+  final StagingMembershipStatus status;
+  final String? uid;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == StagingMembershipStatus.ready ||
+        status == StagingMembershipStatus.notRequired) {
+      return const SizedBox.shrink();
+    }
+    final displayUid = uid ?? 'unknown';
+    final (label, retryEnabled) = switch (status) {
+      StagingMembershipStatus.waiting => (
+        'Administrator membership required for $displayUid',
+        true,
+      ),
+      StagingMembershipStatus.checking => (
+        'Checking membership for $displayUid…',
+        false,
+      ),
+      StagingMembershipStatus.denied => (
+        'Access not ready for $displayUid',
+        true,
+      ),
+      StagingMembershipStatus.ready ||
+      StagingMembershipStatus.notRequired => ('', false),
+    };
+    return Container(
+      width: double.infinity,
+      color: Colors.orange.withValues(alpha: 0.12),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+      child: Row(
+        children: [
+          if (status == StagingMembershipStatus.checking)
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            const Icon(Icons.lock_outline, size: 15, color: Colors.orange),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(label, style: const TextStyle(fontSize: 12)),
+          ),
+          TextButton(
+            onPressed: retryEnabled ? onRetry : null,
+            style: TextButton.styleFrom(minimumSize: const Size(44, 36)),
+            child: const Text('Retry'),
+          ),
+        ],
       ),
     );
   }
@@ -1283,6 +1368,7 @@ enum _AttachmentChoice {
 class _MessageComposer extends ConsumerWidget {
   const _MessageComposer({
     required this.controller,
+    required this.enabled,
     required this.onSend,
     required this.onAttachment,
     required this.onPickedMedia,
@@ -1291,6 +1377,7 @@ class _MessageComposer extends ConsumerWidget {
   });
 
   final TextEditingController controller;
+  final bool enabled;
   final ValueChanged<String> onSend;
   final ValueChanged<_DemoAttachment> onAttachment;
   final ValueChanged<PickedMediaFile> onPickedMedia;
@@ -1417,13 +1504,14 @@ class _MessageComposer extends ConsumerWidget {
           IconButton(
             tooltip: '新增附件',
             icon: const Icon(Icons.add_circle_outline),
-            onPressed: () => _handleAttachment(context, ref),
+            onPressed: enabled ? () => _handleAttachment(context, ref) : null,
           ),
           Expanded(
             child: TextField(
               controller: controller,
+              enabled: enabled,
               textInputAction: TextInputAction.send,
-              onSubmitted: onSend,
+              onSubmitted: enabled ? onSend : null,
               decoration: const InputDecoration(
                 hintText: '輸入訊息…',
                 border: OutlineInputBorder(
@@ -1441,7 +1529,7 @@ class _MessageComposer extends ConsumerWidget {
           ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,
             builder: (context, value, _) {
-              final canSend = value.text.trim().isNotEmpty;
+              final canSend = enabled && value.text.trim().isNotEmpty;
               return IconButton(
                 tooltip: '發送',
                 onPressed: canSend ? () => onSend(value.text) : null,
