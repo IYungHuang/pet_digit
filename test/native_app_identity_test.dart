@@ -16,13 +16,15 @@ void main() {
       expect(content, contains(id), reason: path);
     }
     expect(
-      File('android/app/src/main/kotlin/com/example/chat_pet_mvp/MainActivity.kt')
-          .existsSync(),
+      File(
+        'android/app/src/main/kotlin/com/example/chat_pet_mvp/MainActivity.kt',
+      ).existsSync(),
       isFalse,
     );
     expect(
-      File('android/app/src/main/kotlin/com/iyunghuang/petdigitchat/MainActivity.kt')
-          .readAsStringSync(),
+      File(
+        'android/app/src/main/kotlin/com/iyunghuang/petdigitchat/MainActivity.kt',
+      ).readAsStringSync(),
       contains('package com.iyunghuang.petdigitchat'),
     );
   });

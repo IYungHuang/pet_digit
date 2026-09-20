@@ -559,9 +559,7 @@ class _MembershipBanner extends StatelessWidget {
           else
             const Icon(Icons.lock_outline, size: 15, color: Colors.orange),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(label, style: const TextStyle(fontSize: 12)),
-          ),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
           TextButton(
             onPressed: retryEnabled ? onRetry : null,
             style: TextButton.styleFrom(minimumSize: const Size(44, 36)),

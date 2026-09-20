@@ -22,7 +22,10 @@ class PetParticle {
   double get progress => (1.0 - (lifetime / maxLifetime)).clamp(0.0, 1.0);
   double get opacity => (lifetime / maxLifetime).clamp(0.0, 1.0);
   double get currentSize =>
-      initialSize * (kind == ParticleKind.dust ? (1.0 + progress * 0.5) : (1.0 - progress * 0.3));
+      initialSize *
+      (kind == ParticleKind.dust
+          ? (1.0 + progress * 0.5)
+          : (1.0 - progress * 0.3));
 
   void update(double dt) {
     lifetime -= dt;
@@ -62,9 +65,9 @@ class BouncingEmojiToy {
     required Offset start,
     required this.groundY,
     required this.direction,
-  })  : position = start,
-        velocityX = direction * 140.0,
-        velocityY = -180.0;
+  }) : position = start,
+       velocityX = direction * 140.0,
+       velocityY = -180.0;
 
   final String emoji;
   final double groundY;

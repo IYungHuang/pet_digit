@@ -19,11 +19,12 @@ class ChatMessage {
 }
 
 class ChatRoom {
-  const ChatRoom(
-      {required this.id,
-      required this.name,
-      required this.subtitle,
-      required this.messages});
+  const ChatRoom({
+    required this.id,
+    required this.name,
+    required this.subtitle,
+    required this.messages,
+  });
 
   final String id;
   final String name;

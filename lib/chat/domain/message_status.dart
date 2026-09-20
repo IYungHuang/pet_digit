@@ -1,7 +1,1 @@
-enum MessageDeliveryStatus {
-  pending,
-  uploading,
-  sending,
-  sent,
-  failed,
-}
+enum MessageDeliveryStatus { pending, uploading, sending, sent, failed }

@@ -30,9 +30,39 @@ Storage `9199`, Functions `5001`, Emulator UI `4000`. Run app with:
 flutter run -d macos --dart-define=CHAT_TRANSPORT=emulator
 ```
 
-Environment modes: `fake` (default), `emulator`, and
-`production-placeholder`. Production-placeholder intentionally throws because
-this repository has no production project or credentials.
+Environment modes: `fake` (default), `emulator`, and `staging`. Unknown
+`CHAT_TRANSPORT` values fail startup.
+
+### Firebase staging mode
+
+Staging connects native macOS/iOS debug builds to the real `pet-digit-backend`
+project (`asia-east1` Functions) with Anonymous Auth and App Check debug
+attestation. It never deploys or touches Cloud Functions.
+
+```bash
+flutter run -d macos --dart-define=CHAT_TRANSPORT=staging
+```
+
+App Check debug provider only activates in `kDebugMode`; a profile/release
+staging build fails closed instead of silently falling back to fake.
+
+1. Launch the command above. On first run, `FirebaseAppCheck` prints a debug
+   token to the local console — copy it and register it as a debug token for
+   this app in the Firebase console (App Check → Apps → Manage debug tokens).
+   Treat the token as a secret: never commit it, never paste it into a shared
+   log. Clear it from your terminal scrollback once registered.
+2. The app signs in anonymously and shows the resulting Firebase UID in a
+   membership banner (`waiting` state) — capture that UID.
+3. Client code cannot create or elevate room membership. An administrator
+   must seed an active membership document at
+   `rooms/{roomId}/members/{uid}` with `active: true` for the captured UID
+   before the room becomes readable.
+4. Once membership is seeded, press **Retry** in the banner. Only a
+   successful retry connects the room; a denied retry preserves whatever
+   projection was already on screen.
+
+This task never deploys Functions. Deployment is a separate, explicitly
+authorized step.
 
 Fake/unit tests:
 

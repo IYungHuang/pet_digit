@@ -27,11 +27,11 @@ abstract class ChatMessage with _$ChatMessage {
       _$ChatMessageFromJson(json);
 
   factory ChatMessage.fromDraft(MessageDraft draft) => ChatMessage(
-        clientId: draft.clientId,
-        roomId: draft.roomId,
-        senderId: draft.senderId,
-        content: draft.content,
-        createdAt: draft.createdAt,
-        isMine: draft.isMine,
-      );
+    clientId: draft.clientId,
+    roomId: draft.roomId,
+    senderId: draft.senderId,
+    content: draft.content,
+    createdAt: draft.createdAt,
+    isMine: draft.isMine,
+  );
 }

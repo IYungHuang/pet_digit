@@ -72,17 +72,23 @@ void main() {
       expect(result.name, 'clip.mp4');
     });
 
-    test('throws MediaValidationException when unsupported format is selected', () async {
-      final fakePicker = _FakeImagePickerPlatform(
-        xFileToReturn: XFile('/docs/document.pdf', mimeType: 'application/pdf'),
-      );
-      final service = NativeMediaPickerService(picker: fakePicker);
+    test(
+      'throws MediaValidationException when unsupported format is selected',
+      () async {
+        final fakePicker = _FakeImagePickerPlatform(
+          xFileToReturn: XFile(
+            '/docs/document.pdf',
+            mimeType: 'application/pdf',
+          ),
+        );
+        final service = NativeMediaPickerService(picker: fakePicker);
 
-      expect(
-        () => service.pickImage(source: MediaPickerSource.gallery),
-        throwsA(isA<MediaValidationException>()),
-      );
-    });
+        expect(
+          () => service.pickImage(source: MediaPickerSource.gallery),
+          throwsA(isA<MediaValidationException>()),
+        );
+      },
+    );
   });
 
   group('FakeMediaPickerService', () {

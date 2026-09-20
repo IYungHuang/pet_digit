@@ -5,9 +5,8 @@ part 'message_content.g.dart';
 
 @freezed
 sealed class MessageContent with _$MessageContent {
-  const factory MessageContent.text({
-    required String text,
-  }) = TextMessageContent;
+  const factory MessageContent.text({required String text}) =
+      TextMessageContent;
 
   const factory MessageContent.image({
     required String url,
