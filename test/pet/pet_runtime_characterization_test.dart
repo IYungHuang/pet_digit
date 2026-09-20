@@ -618,6 +618,29 @@ void main() {
     );
   });
 
+  test('one large paw tick emits both impacts and completes normally', () {
+    final controller = PetWorldController();
+    final target = _target();
+
+    controller.startPawTest(target);
+    controller.tick(const Duration(milliseconds: 3000));
+
+    expect(controller.springNotifier.value, 2);
+    expect(controller.getBubbleDeflection(target.id), 0.0);
+    expect(controller.currentAction, PetActionType.none);
+    expect(controller.state, PetState.idle);
+    expect(controller.activeTarget, same(target));
+    expect(controller.activePayload, isNull);
+    controller.tick(const Duration(milliseconds: 1));
+    expect(controller.springNotifier.value, 3);
+    expect(
+      controller.getBubbleDeflection(target.id),
+      closeTo(0.075306, 0.000001),
+    );
+    controller.tick(const Duration(milliseconds: 600));
+    expect(controller.state, PetState.idle);
+  });
+
   test(
     'geometry changes retarget a jump and removal clears its landed runtime',
     () {
