@@ -744,19 +744,19 @@ class _ChatShellState extends ConsumerState<ChatShell> {
               ],
             ),
           ),
+          Material(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            child: _MessageComposer(
+              controller: _composerController,
+              enabled: roomAccessReady,
+              onSend: _sendText,
+              onAttachment: _sendDemoMedia,
+              onPickedMedia: _sendPickedMedia,
+              onError: (msg) => _showFeedback(msg, isError: true),
+              showDemoAttachments: widget.showDemoAttachments,
+            ),
+          ),
         ],
-      ),
-      bottomNavigationBar: Material(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        child: _MessageComposer(
-          controller: _composerController,
-          enabled: roomAccessReady,
-          onSend: _sendText,
-          onAttachment: _sendDemoMedia,
-          onPickedMedia: _sendPickedMedia,
-          onError: (msg) => _showFeedback(msg, isError: true),
-          showDemoAttachments: widget.showDemoAttachments,
-        ),
       ),
     );
   }
