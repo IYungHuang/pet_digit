@@ -153,6 +153,7 @@ class _ContactsDialogState extends ConsumerState<ContactsDialog>
   @override
   Widget build(BuildContext context) {
     return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
@@ -212,6 +213,8 @@ class _ContactsDialogState extends ConsumerState<ContactsDialog>
               // TabBar
               TabBar(
                 controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
                 labelColor: const Color(0xff4361ee),
                 unselectedLabelColor: const Color(0xff6c757d),
                 indicatorColor: const Color(0xff4361ee),
@@ -337,7 +340,10 @@ class _ContactsDialogState extends ConsumerState<ContactsDialog>
               friend.nickname,
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
             ),
-            subtitle: Row(
+            subtitle: Wrap(
+              spacing: 6,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -350,7 +356,6 @@ class _ContactsDialogState extends ConsumerState<ContactsDialog>
                     style: TextStyle(fontSize: 10, color: Color(0xff4361ee)),
                   ),
                 ),
-                const SizedBox(width: 6),
                 const Text('🟢 在線', style: TextStyle(fontSize: 11, color: Color(0xff16a34a))),
               ],
             ),
