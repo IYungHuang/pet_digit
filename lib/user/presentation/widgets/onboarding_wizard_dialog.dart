@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../pet/domain/pet_profile.dart';
 import '../user_pet_providers.dart';
+import 'pet_avatar_widget.dart';
 
 class OnboardingWizardDialog extends ConsumerStatefulWidget {
   const OnboardingWizardDialog({super.key});
@@ -44,7 +46,7 @@ class _OnboardingWizardDialogState
   PetSpecies _selectedSpecies = PetSpecies.dog;
   final _selectedGender = PetGender.unknown;
   String _selectedPersonality = 'playful';
-  String _selectedPetAvatar = 'assets/pets/corgi_real.png';
+  String _selectedPetAvatar = 'assets/pets/corgi_idle_0.png';
 
   final _personalities = [
     'playful',
@@ -85,15 +87,38 @@ class _OnboardingWizardDialogState
       _selectedSpecies = species;
       if (species == PetSpecies.dog) {
         _petBreedController.text = '柯基犬';
-        _selectedPetAvatar = 'assets/pets/corgi_real.png';
+        _selectedPetAvatar = 'assets/pets/corgi_idle_0.png';
       } else if (species == PetSpecies.cat) {
         _petBreedController.text = '英國短毛貓';
-        _selectedPetAvatar = 'assets/pets/cat_real.png';
+        _selectedPetAvatar = 'assets/pets/cat_idle_0.png';
       } else {
         _petBreedController.text = '玄鳳鸚鵡';
-        _selectedPetAvatar = 'assets/pets/parrot_real.png';
+        _selectedPetAvatar = 'assets/pets/parrot_idle_0.png';
       }
     });
+  }
+
+  Future<void> _pickPetPhoto() async {
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (image != null && mounted) {
+        setState(() {
+          _selectedPetAvatar = image.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('選取照片失敗: $e')),
+        );
+      }
+    }
   }
 
   void _nextStep() {
@@ -484,6 +509,37 @@ class _OnboardingWizardDialogState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            PetAvatarWidget(
+              avatarUrl: _selectedPetAvatar,
+              species: _selectedSpecies,
+              size: 56,
+              borderRadius: 14,
+              showBorder: true,
+              borderColor: const Color(0xff4361ee),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.add_a_photo_outlined, size: 16),
+                    label:
+                        const Text('上傳生活照', style: TextStyle(fontSize: 12)),
+                    onPressed: _pickPetPhoto,
+                  ),
+                  const Text(
+                    '支援手機/電腦相簿照片，建立真實分身',
+                    style: TextStyle(fontSize: 11, color: Color(0xff6c757d)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         const Text(
           '寵物物種',
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),

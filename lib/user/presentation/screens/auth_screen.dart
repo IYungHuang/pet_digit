@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../chat/presentation/chat_shell.dart';
 import '../../../pet/domain/pet_profile.dart';
 import '../user_pet_providers.dart';
+import '../widgets/pet_avatar_widget.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -20,12 +22,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _nicknameController = TextEditingController();
   final _searchTagController = TextEditingController();
   final _petNameController = TextEditingController();
-  final _petBreedController = TextEditingController();
+  final _petBreedController = TextEditingController(text: '柴犬');
 
   bool _bindPetNow = false; // By default: pet binding is optional / later!
   PetSpecies _selectedSpecies = PetSpecies.dog;
   final PetGender _selectedGender = PetGender.unknown;
   final String _selectedPersonality = 'playful';
+  String _petAvatarUrl = 'assets/pets/corgi_idle_0.png';
 
   bool _submitting = false;
   String? _errorMessage;
@@ -43,13 +46,39 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     setState(() {
       _selectedSpecies = species;
       if (species == PetSpecies.dog) {
-        _petBreedController.text = '柯基犬';
+        _petBreedController.text = '柴犬';
+        _petAvatarUrl = 'assets/pets/corgi_idle_0.png';
       } else if (species == PetSpecies.cat) {
-        _petBreedController.text = '短毛貓';
+        _petBreedController.text = '英國短毛貓';
+        _petAvatarUrl = 'assets/pets/cat_idle_0.png';
       } else {
-        _petBreedController.text = '鸚鵡';
+        _petBreedController.text = '玄鳳鸚鵡';
+        _petAvatarUrl = 'assets/pets/parrot_idle_0.png';
       }
     });
+  }
+
+  Future<void> _pickCustomAvatar() async {
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (image != null && mounted) {
+        setState(() {
+          _petAvatarUrl = image.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('選取照片失敗: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _handleRegister() async {
@@ -93,7 +122,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           name: petName,
           species: _selectedSpecies,
           breed: petBreed.isNotEmpty ? petBreed : '米克斯',
-          avatarUrl: 'assets/pets/${_selectedSpecies.name}_real.png',
+          avatarUrl: _petAvatarUrl,
           gender: _selectedGender,
           personality: _selectedPersonality,
           setAsDefault: true,
@@ -143,7 +172,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       barrierDismissible: false,
       builder: (dialogCtx) => _ThirdPartyConnectedPetDialog(
         provider: provider,
-        onProceed: (petName, species, breed) async {
+        onProceed: (petName, species, breed, avatarUrl, gender, personality) async {
           Navigator.of(dialogCtx).pop();
 
           setState(() {
@@ -164,13 +193,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             );
 
             if (petName != null && petName.isNotEmpty) {
+              final chosenSpecies = species ?? PetSpecies.dog;
+              final fallbackAvatar = switch (chosenSpecies) {
+                PetSpecies.dog => 'assets/pets/corgi_idle_0.png',
+                PetSpecies.cat => 'assets/pets/cat_idle_0.png',
+                PetSpecies.parrot => 'assets/pets/parrot_idle_0.png',
+              };
               await repo.registerPet(
                 name: petName,
-                species: species ?? PetSpecies.dog,
-                breed: breed ?? '米克斯',
-                avatarUrl: 'assets/pets/${(species ?? PetSpecies.dog).name}_real.png',
-                gender: PetGender.unknown,
-                personality: 'playful',
+                species: chosenSpecies,
+                breed: (breed != null && breed.isNotEmpty) ? breed : '米克斯',
+                avatarUrl: (avatarUrl != null && avatarUrl.isNotEmpty)
+                    ? avatarUrl
+                    : fallbackAvatar,
+                gender: gender ?? PetGender.unknown,
+                personality: personality ?? 'playful',
                 setAsDefault: true,
               );
             }
@@ -433,8 +470,44 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               const Divider(height: 20),
                               Row(
                                 children: [
+                                  PetAvatarWidget(
+                                    avatarUrl: _petAvatarUrl,
+                                    species: _selectedSpecies,
+                                    size: 56,
+                                    borderRadius: 14,
+                                    showBorder: true,
+                                    borderColor: const Color(0xff4361ee),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        OutlinedButton.icon(
+                                          icon: const Icon(
+                                              Icons.add_a_photo_outlined,
+                                              size: 16),
+                                          label: const Text('上傳生活照',
+                                              style: TextStyle(fontSize: 12)),
+                                          onPressed: _pickCustomAvatar,
+                                        ),
+                                        const Text(
+                                          '上傳家中寵物真實生活照',
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              color: Color(0xff6c757d)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
                                   ChoiceChip(
-                                    label: const Text('🐕 柯基犬'),
+                                    label: const Text('🐕 狗狗'),
                                     selected: _selectedSpecies == PetSpecies.dog,
                                     onSelected: (_) =>
                                         _onSpeciesChanged(PetSpecies.dog),
@@ -460,6 +533,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                 controller: _petNameController,
                                 decoration: InputDecoration(
                                   hintText: '輸入寵物名字（如：旺財、波波）',
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 10),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: _petBreedController,
+                                decoration: InputDecoration(
+                                  hintText: '真實品種（如：柴犬、柯基、英短）',
                                   filled: true,
                                   fillColor: Colors.white,
                                   contentPadding: const EdgeInsets.symmetric(
@@ -549,8 +636,14 @@ class _ThirdPartyConnectedPetDialog extends StatefulWidget {
   });
 
   final String provider;
-  final void Function(String? petName, PetSpecies? species, String? breed)
-      onProceed;
+  final void Function(
+    String? petName,
+    PetSpecies? species,
+    String? breed,
+    String? avatarUrl,
+    PetGender? gender,
+    String? personality,
+  ) onProceed;
 
   @override
   State<_ThirdPartyConnectedPetDialog> createState() =>
@@ -560,164 +653,414 @@ class _ThirdPartyConnectedPetDialog extends StatefulWidget {
 class _ThirdPartyConnectedPetDialogState
     extends State<_ThirdPartyConnectedPetDialog> {
   final _petNameController = TextEditingController();
+  final _breedController = TextEditingController(text: '柴犬');
   PetSpecies _selectedSpecies = PetSpecies.dog;
-  String _breed = '柯基犬';
+  String _avatarUrl = 'assets/pets/corgi_idle_0.png';
+  PetGender _selectedGender = PetGender.unknown;
+  final String _selectedPersonality = 'playful';
+
+  final Map<PetSpecies, List<String>> _breedSuggestions = const {
+    PetSpecies.dog: ['柴犬', '柯基犬', '貴賓犬', '黃金獵犬', '米克斯'],
+    PetSpecies.cat: ['英國短毛貓', '美國短毛貓', '橘貓', '布偶貓', '米克斯'],
+    PetSpecies.parrot: ['玄鳳鸚鵡', '虎皮鸚鵡', '金太陽', '小櫻鸚鵡', '灰鸚鵡'],
+  };
+
+  final Map<PetSpecies, List<String>> _presetAvatars = const {
+    PetSpecies.dog: [
+      'assets/pets/corgi_idle_0.png',
+      'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=300&q=80',
+      'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=300&q=80',
+    ],
+    PetSpecies.cat: [
+      'assets/pets/cat_idle_0.png',
+      'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=300&q=80',
+      'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=300&q=80',
+    ],
+    PetSpecies.parrot: [
+      'assets/pets/parrot_idle_0.png',
+      'https://images.unsplash.com/photo-1552728089-57bdde30beb3?w=300&q=80',
+      'https://images.unsplash.com/photo-1544943910-4c1dc44a0ff4?w=300&q=80',
+    ],
+  };
 
   @override
   void dispose() {
     _petNameController.dispose();
+    _breedController.dispose();
     super.dispose();
   }
 
   void _onSpecies(PetSpecies s) {
     setState(() {
       _selectedSpecies = s;
-      _breed = switch (s) {
-        PetSpecies.dog => '柯基犬',
-        PetSpecies.cat => '短毛貓',
-        PetSpecies.parrot => '玄鳳鸚鵡',
-      };
+      _breedController.text = _breedSuggestions[s]!.first;
+      _avatarUrl = _presetAvatars[s]!.first;
     });
+  }
+
+  Future<void> _pickPetPhoto() async {
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (image != null && mounted) {
+        setState(() {
+          _avatarUrl = image.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('選取照片失敗: $e')),
+        );
+      }
+    }
+  }
+
+  String _presetLabel(String url) {
+    if (url.startsWith('assets/')) return '像素款';
+    if (url.contains('54346')) return '柯基寫真';
+    if (url.contains('58351')) return '柴犬寫真';
+    if (url.contains('51488')) return '萌貓寫真';
+    if (url.contains('57386')) return '英短寫真';
+    if (url.contains('55272')) return '鸚鵡寫真';
+    if (url.contains('54494')) return '玄鳳寫真';
+    return '範本寫真';
   }
 
   @override
   Widget build(BuildContext context) {
+    final presets = _presetAvatars[_selectedSpecies] ?? [];
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 440),
+        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 680),
         child: Container(
           padding: const EdgeInsets.all(24),
           color: Colors.white,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Connection Success Header
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xffeffcf6),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xffa7f3d0)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle,
-                        color: Color(0xff059669), size: 24),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${widget.provider} 帳號已成功連結 ✔',
-                            style: const TextStyle(
-                              color: Color(0xff065f46),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. Connection Success Header
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffeffcf6),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xffa7f3d0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle,
+                          color: Color(0xff059669), size: 24),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${widget.provider} 帳號已成功連結 ✔',
+                              style: const TextStyle(
+                                color: Color(0xff065f46),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
+                            Text(
+                              '已透過 Firebase Auth 安全憑證完成授權 (${widget.provider.toLowerCase()}.com)',
+                              style: const TextStyle(
+                                color: Color(0xff047857),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 2. Question / Slogan
+                const Text(
+                  '🎉 歡迎踏入數位寵物世界！',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '將您現實中的心愛寵物綁進數位世界，建立專屬分身（可稍後於背包綁定）',
+                  style: TextStyle(fontSize: 12, color: Color(0xff6c757d)),
+                ),
+                const SizedBox(height: 16),
+
+                // 3. Media / Real Photo Upload Section
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xfff8faff),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xffe2e8f0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          PetAvatarWidget(
+                            avatarUrl: _avatarUrl,
+                            species: _selectedSpecies,
+                            size: 68,
+                            borderRadius: 16,
+                            showBorder: true,
+                            borderColor: const Color(0xff4361ee),
+                            borderWidth: 2,
                           ),
-                          Text(
-                            '已透過 Firebase Auth 安全憑證完成授權 (${widget.provider.toLowerCase()}.com)',
-                            style: const TextStyle(
-                              color: Color(0xff047857),
-                              fontSize: 11,
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '📸 上傳現實寵物生活照',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xff1f2030),
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                const Text(
+                                  '支援手機/電腦相簿照片，打造專屬代表分身',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xff6c757d),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.add_a_photo_outlined,
+                                      size: 15),
+                                  label: const Text('選取生活照',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xff4361ee),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  onPressed: _pickPetPhoto,
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Text(
+                            '或挑選範本寫真：',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xff6c757d)),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: presets.map((preset) {
+                                  final isSel = _avatarUrl == preset;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: ChoiceChip(
+                                      label: Text(_presetLabel(preset),
+                                          style: const TextStyle(fontSize: 10)),
+                                      selected: isSel,
+                                      onSelected: (_) => setState(
+                                          () => _avatarUrl = preset),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // 4. Species selector
+                Row(
+                  children: [
+                    ChoiceChip(
+                      label: const Text('🐕 狗狗'),
+                      selected: _selectedSpecies == PetSpecies.dog,
+                      onSelected: (_) => _onSpecies(PetSpecies.dog),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('🐱 貓咪'),
+                      selected: _selectedSpecies == PetSpecies.cat,
+                      onSelected: (_) => _onSpecies(PetSpecies.cat),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('🦜 鸚鵡'),
+                      selected: _selectedSpecies == PetSpecies.parrot,
+                      onSelected: (_) => _onSpecies(PetSpecies.parrot),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 18),
+                const SizedBox(height: 10),
 
-              // Question: Adopt first pet?
-              const Text(
-                '🎉 歡迎踏入數位寵物世界！',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                '要現在挑選你的第一隻專屬寵物夥伴嗎？（也可以稍後於背包領養）',
-                style: TextStyle(fontSize: 12, color: Color(0xff6c757d)),
-              ),
-              const SizedBox(height: 16),
-
-              // Species selector
-              Row(
-                children: [
-                  ChoiceChip(
-                    label: const Text('🐕 狗狗'),
-                    selected: _selectedSpecies == PetSpecies.dog,
-                    onSelected: (_) => _onSpecies(PetSpecies.dog),
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('🐱 貓咪'),
-                    selected: _selectedSpecies == PetSpecies.cat,
-                    onSelected: (_) => _onSpecies(PetSpecies.cat),
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('🦜 鸚鵡'),
-                    selected: _selectedSpecies == PetSpecies.parrot,
-                    onSelected: (_) => _onSpecies(PetSpecies.parrot),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              TextField(
-                controller: _petNameController,
-                decoration: InputDecoration(
-                  hintText: '替牠取個名字（如：旺財、波波）',
-                  filled: true,
-                  fillColor: const Color(0xfff8f9fa),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xffdee2e6)),
+                // 5. Name Input
+                TextField(
+                  controller: _petNameController,
+                  decoration: InputDecoration(
+                    labelText: '寵物名字',
+                    hintText: '替牠取個名字（如：旺財、波波）',
+                    filled: true,
+                    fillColor: const Color(0xfff8f9fa),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xffdee2e6)),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 10),
 
-              // Actions
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xff4361ee),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                // 6. Breed Input & Suggestions
+                TextField(
+                  controller: _breedController,
+                  decoration: InputDecoration(
+                    labelText: '品種（如：柴犬、柯基、英短）',
+                    isDense: true,
+                    filled: true,
+                    fillColor: const Color(0xfff8f9fa),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xffdee2e6)),
+                    ),
                   ),
                 ),
-                onPressed: () {
-                  final name = _petNameController.text.trim();
-                  widget.onProceed(
-                    name.isNotEmpty ? name : '阿福',
-                    _selectedSpecies,
-                    _breed,
-                  );
-                },
-                child: const Text(
-                  '🐾 馬上領養寵物夥伴並進入',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                const SizedBox(height: 6),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      const Text('熱門品種：',
+                          style: TextStyle(
+                              fontSize: 11, color: Color(0xff6c757d))),
+                      ...(_breedSuggestions[_selectedSpecies] ?? []).map((b) =>
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ActionChip(
+                              label: Text(b,
+                                  style: const TextStyle(fontSize: 11)),
+                              onPressed: () =>
+                                  setState(() => _breedController.text = b),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          )),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => widget.onProceed(null, null, null),
-                child: const Text(
-                  '稍後再領養，直接進入聊天室 ➔',
-                  style: TextStyle(color: Color(0xff6c757d)),
+                const SizedBox(height: 10),
+
+                // 7. Gender
+                Row(
+                  children: [
+                    const Text('性別：',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 4),
+                    ChoiceChip(
+                      label: const Text('♂ 公', style: TextStyle(fontSize: 11)),
+                      selected: _selectedGender == PetGender.male,
+                      onSelected: (_) =>
+                          setState(() => _selectedGender = PetGender.male),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const SizedBox(width: 6),
+                    ChoiceChip(
+                      label: const Text('♀ 母', style: TextStyle(fontSize: 11)),
+                      selected: _selectedGender == PetGender.female,
+                      onSelected: (_) =>
+                          setState(() => _selectedGender = PetGender.female),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const SizedBox(width: 6),
+                    ChoiceChip(
+                      label:
+                          const Text('✂️ 結紮', style: TextStyle(fontSize: 11)),
+                      selected: _selectedGender == PetGender.neutered,
+                      onSelected: (_) =>
+                          setState(() => _selectedGender = PetGender.neutered),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 18),
+
+                // Actions
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xff4361ee),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () {
+                    final name = _petNameController.text.trim();
+                    final breed = _breedController.text.trim();
+                    widget.onProceed(
+                      name.isNotEmpty ? name : '阿福',
+                      _selectedSpecies,
+                      breed.isNotEmpty ? breed : '米克斯',
+                      _avatarUrl,
+                      _selectedGender,
+                      _selectedPersonality,
+                    );
+                  },
+                  child: const Text(
+                    '🐾 馬上領養寵物夥伴並進入',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => widget.onProceed(
+                      null, null, null, null, null, null),
+                  child: const Text(
+                    '稍後再領養，直接進入聊天室 ➔',
+                    style: TextStyle(color: Color(0xff6c757d)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

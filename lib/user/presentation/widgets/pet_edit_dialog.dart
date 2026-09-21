@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../pet/domain/pet_profile.dart';
 import '../user_pet_providers.dart';
+import 'pet_avatar_widget.dart';
 
 class PetEditDialog extends ConsumerStatefulWidget {
   const PetEditDialog({super.key, required this.pet});
@@ -292,37 +293,14 @@ class _PetEditDialogState extends ConsumerState<PetEditDialog> {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          CircleAvatar(
-                            radius: 32,
-                            backgroundColor: const Color(0xffeff2fe),
-                            child: ClipOval(
-                              child: _selectedAvatarUrl.startsWith('http')
-                                  ? Image.network(
-                                      _selectedAvatarUrl,
-                                      width: 64,
-                                      height: 64,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) =>
-                                          const Text('🐾',
-                                              style: TextStyle(fontSize: 28)),
-                                    )
-                                  : _selectedAvatarUrl.startsWith('assets/')
-                                      ? Image.asset(
-                                          _selectedAvatarUrl,
-                                          width: 64,
-                                          height: 64,
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (_, __, ___) =>
-                                              const Text('🐾',
-                                                  style:
-                                                      TextStyle(fontSize: 28)),
-                                        )
-                                      : const Icon(
-                                          Icons.pets,
-                                          size: 32,
-                                          color: Color(0xff4361ee),
-                                        ),
-                            ),
+                          PetAvatarWidget(
+                            avatarUrl: _selectedAvatarUrl,
+                            species: widget.pet.species,
+                            size: 68,
+                            borderRadius: 18,
+                            showBorder: true,
+                            borderColor: const Color(0xff4361ee),
+                            borderWidth: 2,
                           ),
                           const SizedBox(width: 14),
                           Expanded(

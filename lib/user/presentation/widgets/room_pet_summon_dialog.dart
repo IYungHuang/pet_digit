@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../pet/domain/pet_profile.dart';
 import '../user_pet_providers.dart';
+import 'pet_avatar_widget.dart';
 
 class RoomPetSummonDialog extends ConsumerStatefulWidget {
   const RoomPetSummonDialog({
@@ -47,17 +48,6 @@ class _RoomPetSummonDialogState extends ConsumerState<RoomPetSummonDialog> {
       _selectedPetIds.addAll(activePetIds);
     } else {
       _selectedPetIds.add(allPets.first.petId);
-    }
-  }
-
-  String _speciesEmoji(PetSpecies species) {
-    switch (species) {
-      case PetSpecies.dog:
-        return '🐕';
-      case PetSpecies.cat:
-        return '🐱';
-      case PetSpecies.parrot:
-        return '🦜';
     }
   }
 
@@ -236,9 +226,11 @@ class _RoomPetSummonDialogState extends ConsumerState<RoomPetSummonDialog> {
                         ),
                         child: Row(
                           children: [
-                            Text(
-                              _speciesEmoji(pet.species),
-                              style: const TextStyle(fontSize: 22),
+                            PetAvatarWidget(
+                              avatarUrl: pet.avatarUrl,
+                              species: pet.species,
+                              size: 38,
+                              borderRadius: 10,
                             ),
                             const SizedBox(width: 12),
                             Expanded(

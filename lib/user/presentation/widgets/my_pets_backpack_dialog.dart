@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../pet/domain/pet_profile.dart';
 import '../user_pet_providers.dart';
+import 'pet_avatar_widget.dart';
 import 'pet_edit_dialog.dart';
 
 class MyPetsBackpackDialog extends ConsumerStatefulWidget {
@@ -29,6 +31,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
   final _petBreedController = TextEditingController();
   PetSpecies _selectedSpecies = PetSpecies.dog;
   String _selectedPersonality = 'playful';
+  String _newPetAvatarUrl = 'assets/pets/corgi_idle_0.png';
 
   @override
   void dispose() {
@@ -54,14 +57,26 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
     }
   }
 
-  String _speciesEmoji(PetSpecies species) {
-    switch (species) {
-      case PetSpecies.dog:
-        return '🐕';
-      case PetSpecies.cat:
-        return '🐱';
-      case PetSpecies.parrot:
-        return '🦜';
+  Future<void> _pickPetPhoto() async {
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (image != null && mounted) {
+        setState(() {
+          _newPetAvatarUrl = image.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('選取生活照失敗: $e')),
+        );
+      }
     }
   }
 
@@ -85,7 +100,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
         name: name,
         species: _selectedSpecies,
         breed: breed.isNotEmpty ? breed : '米克斯',
-        avatarUrl: 'assets/pets/${_selectedSpecies.name}_real.png',
+        avatarUrl: _newPetAvatarUrl,
         personality: _selectedPersonality,
       );
 
@@ -281,19 +296,13 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xffeff2fe),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Center(
-              child: Text(
-                _speciesEmoji(pet.species),
-                style: const TextStyle(fontSize: 24),
-              ),
-            ),
+          PetAvatarWidget(
+            avatarUrl: pet.avatarUrl,
+            species: pet.species,
+            size: 48,
+            borderRadius: 14,
+            showBorder: isDefault,
+            borderColor: const Color(0xff4361ee),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -422,6 +431,38 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
             ),
             const SizedBox(height: 8),
           ],
+          Row(
+            children: [
+              PetAvatarWidget(
+                avatarUrl: _newPetAvatarUrl,
+                species: _selectedSpecies,
+                size: 52,
+                borderRadius: 14,
+                showBorder: true,
+                borderColor: const Color(0xff4361ee),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.add_a_photo_outlined, size: 15),
+                      label: const Text('上傳生活照',
+                          style: TextStyle(fontSize: 12)),
+                      onPressed: _pickPetPhoto,
+                    ),
+                    const Text(
+                      '上傳家中寵物真實萌照',
+                      style: TextStyle(
+                          fontSize: 11, color: Color(0xff6c757d)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               _speciesRadio(PetSpecies.dog, '狗狗', '🐕'),

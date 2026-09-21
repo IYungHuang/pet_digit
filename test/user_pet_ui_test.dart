@@ -291,12 +291,15 @@ void main() {
 
       expect(find.text('Google 帳號已成功連結 ✔'), findsOneWidget);
       expect(find.text('🎉 歡迎踏入數位寵物世界！'), findsOneWidget);
-      expect(find.text('🐾 馬上領養寵物夥伴並進入'), findsOneWidget);
+      expect(find.text('📸 上傳現實寵物生活照'), findsOneWidget);
+      expect(find.text('選取生活照'), findsOneWidget);
 
       // Enter pet name and adopt
       await tester.enterText(
           find.widgetWithText(TextField, '替牠取個名字（如：旺財、波波）'), '皮卡');
-      await tester.tap(find.text('🐾 馬上領養寵物夥伴並進入'));
+      final adoptButton = find.text('🐾 馬上領養寵物夥伴並進入');
+      await tester.ensureVisible(adoptButton);
+      await tester.tap(adoptButton);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
