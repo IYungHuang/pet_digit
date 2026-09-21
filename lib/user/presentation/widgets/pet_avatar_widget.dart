@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../../common/services/image_optimization_service.dart';
 import '../../../pet/domain/pet_profile.dart';
 
 /// Reusable widget for displaying pet avatar from local file, network URL, or assets.
@@ -28,6 +29,7 @@ class PetAvatarWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget imageContent;
+    final cacheDim = ImageOptimizationService.calculateCacheDimension(context, size);
 
     final trimmed = avatarUrl.trim();
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
@@ -35,7 +37,22 @@ class PetAvatarWidget extends StatelessWidget {
         trimmed,
         width: size,
         height: size,
+        cacheWidth: cacheDim,
+        cacheHeight: cacheDim,
         fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Center(
+            child: SizedBox(
+              width: size * 0.4,
+              height: size * 0.4,
+              child: const CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xff4361ee),
+              ),
+            ),
+          );
+        },
         errorBuilder: (_, __, ___) => _buildFallback(),
       );
     } else if (trimmed.startsWith('assets/') || trimmed.startsWith('asset:')) {
@@ -44,6 +61,8 @@ class PetAvatarWidget extends StatelessWidget {
         assetPath,
         width: size,
         height: size,
+        cacheWidth: cacheDim,
+        cacheHeight: cacheDim,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => _buildFallback(),
       );
@@ -52,6 +71,8 @@ class PetAvatarWidget extends StatelessWidget {
         File(trimmed),
         width: size,
         height: size,
+        cacheWidth: cacheDim,
+        cacheHeight: cacheDim,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => _buildFallback(),
       );

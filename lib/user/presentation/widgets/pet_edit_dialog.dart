@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../common/services/image_optimization_service.dart';
 import '../../../pet/domain/pet_profile.dart';
 import '../user_pet_providers.dart';
 import 'pet_avatar_widget.dart';
@@ -100,12 +101,10 @@ class _PetEditDialogState extends ConsumerState<PetEditDialog> {
 
   Future<void> _pickCustomAvatar() async {
     try {
-      final picker = ImagePicker();
-      final image = await picker.pickImage(
+      final service = ImageOptimizationService();
+      final image = await service.pickOptimizedImage(
         source: ImageSource.gallery,
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 85,
+        preset: ImageOptimizationPreset.avatar,
       );
       if (image != null && mounted) {
         setState(() {
@@ -114,8 +113,10 @@ class _PetEditDialogState extends ConsumerState<PetEditDialog> {
       }
     } catch (e) {
       if (mounted) {
+        final message =
+            e is ImageOptimizationException ? e.message : '選取照片失敗: $e';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('選取照片失敗: $e')),
+          SnackBar(content: Text(message)),
         );
       }
     }

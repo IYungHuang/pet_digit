@@ -58,7 +58,12 @@ class NativeMediaPickerService implements MediaPickerService {
         : ImageSource.gallery;
     XFile? file;
     try {
-      file = await _picker.pickImage(source: imageSource);
+      file = await _picker.pickImage(
+        source: imageSource,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
     } on UnimplementedError {
       throw const MediaValidationException('當前裝置不支援相機拍攝，請選取電腦中的圖片檔案');
     } on UnsupportedError {
@@ -109,7 +114,10 @@ class NativeMediaPickerService implements MediaPickerService {
         : ImageSource.gallery;
     XFile? file;
     try {
-      file = await _picker.pickVideo(source: imageSource);
+      file = await _picker.pickVideo(
+        source: imageSource,
+        maxDuration: const Duration(seconds: 60),
+      );
     } on UnimplementedError {
       throw const MediaValidationException('當前裝置不支援相機拍攝，請選取電腦中的影片檔案');
     } on UnsupportedError {

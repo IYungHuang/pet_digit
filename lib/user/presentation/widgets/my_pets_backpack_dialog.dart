@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../common/services/image_optimization_service.dart';
 import '../../../pet/domain/pet_profile.dart';
 import '../user_pet_providers.dart';
 import 'pet_avatar_widget.dart';
@@ -59,12 +60,10 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
 
   Future<void> _pickPetPhoto() async {
     try {
-      final picker = ImagePicker();
-      final image = await picker.pickImage(
+      final service = ImageOptimizationService();
+      final image = await service.pickOptimizedImage(
         source: ImageSource.gallery,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
+        preset: ImageOptimizationPreset.galleryPhoto,
       );
       if (image != null && mounted) {
         setState(() {
@@ -73,8 +72,10 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
       }
     } catch (e) {
       if (mounted) {
+        final message =
+            e is ImageOptimizationException ? e.message : '選取生活照失敗: $e';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('選取生活照失敗: $e')),
+          SnackBar(content: Text(message)),
         );
       }
     }

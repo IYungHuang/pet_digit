@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../chat/presentation/chat_shell.dart';
+import '../../../common/services/image_optimization_service.dart';
 import '../../../pet/domain/pet_profile.dart';
 import '../user_pet_providers.dart';
 import '../widgets/pet_avatar_widget.dart';
@@ -60,12 +61,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   Future<void> _pickCustomAvatar() async {
     try {
-      final picker = ImagePicker();
-      final image = await picker.pickImage(
+      final service = ImageOptimizationService();
+      final image = await service.pickOptimizedImage(
         source: ImageSource.gallery,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
+        preset: ImageOptimizationPreset.avatar,
       );
       if (image != null && mounted) {
         setState(() {
@@ -74,8 +73,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final message =
+            e is ImageOptimizationException ? e.message : '選取照片失敗: $e';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('選取照片失敗: $e')),
+          SnackBar(content: Text(message)),
         );
       }
     }
@@ -700,12 +701,10 @@ class _ThirdPartyConnectedPetDialogState
 
   Future<void> _pickPetPhoto() async {
     try {
-      final picker = ImagePicker();
-      final image = await picker.pickImage(
+      final service = ImageOptimizationService();
+      final image = await service.pickOptimizedImage(
         source: ImageSource.gallery,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
+        preset: ImageOptimizationPreset.galleryPhoto,
       );
       if (image != null && mounted) {
         setState(() {
@@ -714,8 +713,10 @@ class _ThirdPartyConnectedPetDialogState
       }
     } catch (e) {
       if (mounted) {
+        final message =
+            e is ImageOptimizationException ? e.message : '選取照片失敗: $e';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('選取照片失敗: $e')),
+          SnackBar(content: Text(message)),
         );
       }
     }
