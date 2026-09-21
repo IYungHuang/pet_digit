@@ -139,7 +139,7 @@ class _PetEditDialogState extends ConsumerState<PetEditDialog> {
     final breed = _breedController.text.trim();
 
     if (name.isEmpty) {
-      setState(() => _errorMessage = '請輸入毛孩姓名');
+      setState(() => _errorMessage = '請輸入寵物姓名');
       return;
     }
 
@@ -164,7 +164,7 @@ class _PetEditDialogState extends ConsumerState<PetEditDialog> {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✨ 已成功更新毛孩「$name」的資料！'),
+            content: Text('✨ 已成功更新寵物「$name」的資料！'),
             backgroundColor: const Color(0xff4361ee),
           ),
         );
@@ -219,7 +219,7 @@ class _PetEditDialogState extends ConsumerState<PetEditDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '編輯毛孩資料 - ${widget.pet.name}',
+                            '編輯寵物資料 - ${widget.pet.name}',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
@@ -282,7 +282,7 @@ class _PetEditDialogState extends ConsumerState<PetEditDialog> {
 
                       // 1. Avatar Section
                       const Text(
-                        '毛孩頭像',
+                        '寵物頭像',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -384,7 +384,7 @@ class _PetEditDialogState extends ConsumerState<PetEditDialog> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  '毛孩名字',
+                                  '寵物名字',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
@@ -438,7 +438,7 @@ class _PetEditDialogState extends ConsumerState<PetEditDialog> {
 
                       // 3. Gender
                       const Text(
-                        '毛孩性別',
+                        '寵物性別',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,

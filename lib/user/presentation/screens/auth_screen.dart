@@ -66,7 +66,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
 
     if (_bindPetNow && _petNameController.text.trim().isEmpty) {
-      setState(() => _errorMessage = '若勾選綁定毛孩，請輸入毛孩名字');
+      setState(() => _errorMessage = '若勾選登記寵物，請輸入寵物名字');
       return;
     }
 
@@ -121,18 +121,81 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Future<void> _handleThirdPartyLogin(String provider) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('⚡ 已啟動 $provider 直連：使用 Firebase Auth 進行安全連線中...'),
-        duration: const Duration(seconds: 2),
+    final providerId =
+        provider.toLowerCase() == 'google' ? 'google.com' : 'apple.com';
+
+    // Mark provider as linked
+    ref.read(demoLinkedAccountsProvider.notifier).update((state) {
+      return state.contains(providerId) ? state : [...state, providerId];
+    });
+
+    final defaultNick = '$provider 使用者';
+    final defaultTag = '${provider.toLowerCase()}_user';
+
+    if (_nicknameController.text.isEmpty) {
+      _nicknameController.text = defaultNick;
+      _searchTagController.text = defaultTag;
+    }
+
+    // Show prompt to pick pet or proceed
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => _ThirdPartyConnectedPetDialog(
+        provider: provider,
+        onProceed: (petName, species, breed) async {
+          Navigator.of(dialogCtx).pop();
+
+          setState(() {
+            _submitting = true;
+            _errorMessage = null;
+          });
+
+          try {
+            final repo = ref.read(userPetRepositoryProvider);
+            await repo.upsertUserProfile(
+              nickname: _nicknameController.text.trim().isNotEmpty
+                  ? _nicknameController.text.trim()
+                  : defaultNick,
+              avatarUrl: 'assets/avatars/user_me.png',
+              searchTag: _searchTagController.text.trim().isNotEmpty
+                  ? _searchTagController.text.trim()
+                  : defaultTag,
+            );
+
+            if (petName != null && petName.isNotEmpty) {
+              await repo.registerPet(
+                name: petName,
+                species: species ?? PetSpecies.dog,
+                breed: breed ?? '米克斯',
+                avatarUrl: 'assets/pets/${(species ?? PetSpecies.dog).name}_real.png',
+                gender: PetGender.unknown,
+                personality: 'playful',
+                setAsDefault: true,
+              );
+            }
+
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute<void>(
+                  builder: (_) => const ChatShell(
+                    showDemoAttachments: true,
+                    autoShowOnboarding: false,
+                  ),
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              setState(() {
+                _submitting = false;
+                _errorMessage = e.toString().replaceAll('Exception: ', '');
+              });
+            }
+          }
+        },
       ),
     );
-    // Pre-fill quick placeholder for quick onboarding
-    if (_nicknameController.text.isEmpty) {
-      _nicknameController.text = '$provider 用戶';
-      _searchTagController.text = '${provider.toLowerCase()}_user';
-    }
-    await _handleRegister();
   }
 
   @override
@@ -182,7 +245,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       const SizedBox(height: 6),
                       const Center(
                         child: Text(
-                          '建立你的主人身分，隨時領養你的專屬像素毛孩',
+                          '建立你的主人身分，隨時領養你的專屬數位寵物夥伴',
                           style: TextStyle(fontSize: 13, color: Color(0xff6c757d)),
                         ),
                       ),
@@ -277,7 +340,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       TextField(
                         controller: _nicknameController,
                         decoration: InputDecoration(
-                          hintText: '例如：柯基飼養員',
+                          hintText: '例如：寵物飼養員',
                           prefixIcon: const Icon(Icons.person_outline, size: 20),
                           filled: true,
                           fillColor: const Color(0xfff8f9fa),
@@ -299,7 +362,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       TextField(
                         controller: _searchTagController,
                         decoration: InputDecoration(
-                          hintText: 'corgi_lover_99',
+                          hintText: 'pixel_master_88',
                           prefixIcon: const Icon(Icons.alternate_email, size: 20),
                           filled: true,
                           fillColor: const Color(0xfff8f9fa),
@@ -348,7 +411,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        '立即登記首隻毛孩 (可選)',
+                                        '立即登記首隻寵物夥伴 (可選)',
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w700,
@@ -396,7 +459,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               TextField(
                                 controller: _petNameController,
                                 decoration: InputDecoration(
-                                  hintText: '輸入毛孩名字（如：旺財）',
+                                  hintText: '輸入寵物名字（如：旺財、波波）',
                                   filled: true,
                                   fillColor: Colors.white,
                                   contentPadding: const EdgeInsets.symmetric(
@@ -433,7 +496,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                 ),
                               )
                             : Text(
-                                _bindPetNow ? '完成註冊並領養毛孩 🚀' : '完成身分登記，直接進入 🚀',
+                                _bindPetNow ? '完成註冊並登記寵物 🚀' : '完成身分登記，直接進入 🚀',
                                 style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
@@ -472,6 +535,189 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThirdPartyConnectedPetDialog extends StatefulWidget {
+  const _ThirdPartyConnectedPetDialog({
+    required this.provider,
+    required this.onProceed,
+  });
+
+  final String provider;
+  final void Function(String? petName, PetSpecies? species, String? breed)
+      onProceed;
+
+  @override
+  State<_ThirdPartyConnectedPetDialog> createState() =>
+      _ThirdPartyConnectedPetDialogState();
+}
+
+class _ThirdPartyConnectedPetDialogState
+    extends State<_ThirdPartyConnectedPetDialog> {
+  final _petNameController = TextEditingController();
+  PetSpecies _selectedSpecies = PetSpecies.dog;
+  String _breed = '柯基犬';
+
+  @override
+  void dispose() {
+    _petNameController.dispose();
+    super.dispose();
+  }
+
+  void _onSpecies(PetSpecies s) {
+    setState(() {
+      _selectedSpecies = s;
+      _breed = switch (s) {
+        PetSpecies.dog => '柯基犬',
+        PetSpecies.cat => '短毛貓',
+        PetSpecies.parrot => '玄鳳鸚鵡',
+      };
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          color: Colors.white,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Connection Success Header
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xffeffcf6),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xffa7f3d0)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle,
+                        color: Color(0xff059669), size: 24),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${widget.provider} 帳號已成功連結 ✔',
+                            style: const TextStyle(
+                              color: Color(0xff065f46),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            '已透過 Firebase Auth 安全憑證完成授權 (${widget.provider.toLowerCase()}.com)',
+                            style: const TextStyle(
+                              color: Color(0xff047857),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Question: Adopt first pet?
+              const Text(
+                '🎉 歡迎踏入數位寵物世界！',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '要現在挑選你的第一隻專屬寵物夥伴嗎？（也可以稍後於背包領養）',
+                style: TextStyle(fontSize: 12, color: Color(0xff6c757d)),
+              ),
+              const SizedBox(height: 16),
+
+              // Species selector
+              Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('🐕 狗狗'),
+                    selected: _selectedSpecies == PetSpecies.dog,
+                    onSelected: (_) => _onSpecies(PetSpecies.dog),
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('🐱 貓咪'),
+                    selected: _selectedSpecies == PetSpecies.cat,
+                    onSelected: (_) => _onSpecies(PetSpecies.cat),
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('🦜 鸚鵡'),
+                    selected: _selectedSpecies == PetSpecies.parrot,
+                    onSelected: (_) => _onSpecies(PetSpecies.parrot),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              TextField(
+                controller: _petNameController,
+                decoration: InputDecoration(
+                  hintText: '替牠取個名字（如：旺財、波波）',
+                  filled: true,
+                  fillColor: const Color(0xfff8f9fa),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xffdee2e6)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Actions
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xff4361ee),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onPressed: () {
+                  final name = _petNameController.text.trim();
+                  widget.onProceed(
+                    name.isNotEmpty ? name : '阿福',
+                    _selectedSpecies,
+                    _breed,
+                  );
+                },
+                child: const Text(
+                  '🐾 馬上領養寵物夥伴並進入',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => widget.onProceed(null, null, null),
+                child: const Text(
+                  '稍後再領養，直接進入聊天室 ➔',
+                  style: TextStyle(color: Color(0xff6c757d)),
+                ),
+              ),
+            ],
           ),
         ),
       ),

@@ -63,7 +63,7 @@ class _RoomPetSummonDialogState extends ConsumerState<RoomPetSummonDialog> {
 
   Future<void> _handleConfirm() async {
     if (_selectedPetIds.isEmpty) {
-      setState(() => _errorMessage = '請至少勾選一隻毛孩進房陪伴！');
+      setState(() => _errorMessage = '請至少勾選一隻寵物進房陪伴！');
       return;
     }
 
@@ -85,7 +85,7 @@ class _RoomPetSummonDialogState extends ConsumerState<RoomPetSummonDialog> {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('🐾 已更新出動毛孩！共有 ${_selectedPetIds.length} 隻在房間中跑動'),
+            content: Text('🐾 已更新出動寵物！共有 ${_selectedPetIds.length} 隻在房間中跑動'),
             backgroundColor: const Color(0xff4361ee),
           ),
         );
@@ -146,7 +146,7 @@ class _RoomPetSummonDialogState extends ConsumerState<RoomPetSummonDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          '房間毛孩出動調度',
+                          '房間寵物出動調度',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
@@ -154,7 +154,7 @@ class _RoomPetSummonDialogState extends ConsumerState<RoomPetSummonDialog> {
                           ),
                         ),
                         Text(
-                          '勾選在此聊天室同台跑動的毛孩 (可部分或全部)',
+                          '勾選在此聊天室同台跑動的寵物 (可部分或全部)',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
@@ -192,7 +192,7 @@ class _RoomPetSummonDialogState extends ConsumerState<RoomPetSummonDialog> {
               if (allPets.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Center(child: Text('您名下尚無登記毛孩，請先至背包登記')),
+                  child: Center(child: Text('您名下尚無登記寵物，請先至背包登記')),
                 )
               else
                 ListView.separated(
@@ -211,7 +211,7 @@ class _RoomPetSummonDialogState extends ConsumerState<RoomPetSummonDialog> {
                             if (_selectedPetIds.length > 1) {
                               _selectedPetIds.remove(pet.petId);
                             } else {
-                              _errorMessage = '房間內至少需保留 1 隻毛孩陪伴！';
+                              _errorMessage = '房間內至少需保留 1 隻寵物陪伴！';
                             }
                           } else {
                             _errorMessage = null;
@@ -274,7 +274,7 @@ class _RoomPetSummonDialogState extends ConsumerState<RoomPetSummonDialog> {
                                     if (_selectedPetIds.length > 1) {
                                       _selectedPetIds.remove(pet.petId);
                                     } else {
-                                      _errorMessage = '房間內至少需保留 1 隻毛孩陪伴！';
+                                      _errorMessage = '房間內至少需保留 1 隻寵物陪伴！';
                                     }
                                   }
                                 });

@@ -563,7 +563,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
         ),
         actions: [
           PopupMenuButton<String>(
-            tooltip: '操作焦點毛孩',
+            tooltip: '操作焦點寵物',
             icon: const Icon(Icons.touch_app_outlined, color: Color(0xff4361ee)),
             onSelected: (val) => setState(() => _activePetCommandId = val),
             itemBuilder: (context) => [
@@ -603,19 +603,19 @@ class _ChatShellState extends ConsumerState<ChatShell> {
                     else
                       const SizedBox(width: 16),
                     const SizedBox(width: 6),
-                    const Text('🔥 全體毛孩一起動！'),
+                    const Text('🔥 全體寵物一起動！'),
                   ],
                 ),
               ),
             ],
           ),
           IconButton(
-            tooltip: '我的毛孩背包',
+            tooltip: '我的寵物背包',
             icon: const Icon(Icons.backpack_outlined, color: Color(0xff4361ee)),
             onPressed: () => MyPetsBackpackDialog.show(context),
           ),
           IconButton(
-            tooltip: '毛孩出動調度',
+            tooltip: '房間寵物出動調度',
             icon: const Icon(Icons.pets_rounded, color: Color(0xff4361ee)),
             onPressed: () => RoomPetSummonDialog.show(
               context,

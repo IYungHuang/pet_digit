@@ -134,7 +134,7 @@ class _UserProfileDialogState extends ConsumerState<UserProfileDialog> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        const Text('建立主人與第一隻毛孩的資料即可開始聊天！'),
+        const Text('建立主人與第一隻寵物夥伴的資料即可開始聊天！'),
         const SizedBox(height: 20),
         FilledButton.icon(
           onPressed: () {
@@ -276,12 +276,149 @@ class _UserProfileDialogState extends ConsumerState<UserProfileDialog> {
 
           const Divider(height: 32),
 
+          // Linked Accounts Section
+          Builder(
+            builder: (context) {
+              final linkedProviders = ref.watch(linkedProvidersProvider);
+              final isGoogleLinked = linkedProviders.contains('google.com');
+              final isAppleLinked = linkedProviders.contains('apple.com');
+
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xfff8f9fa),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xffe9ecef)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.shield_outlined,
+                            size: 16, color: Color(0xff4361ee)),
+                        SizedBox(width: 6),
+                        Text(
+                          '帳號安全與社群連結',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xff495057),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        // Google
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isGoogleLinked
+                                  ? const Color(0xffeffcf6)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isGoogleLinked
+                                    ? const Color(0xff34d399)
+                                    : const Color(0xffdee2e6),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Text('🌐',
+                                    style: TextStyle(fontSize: 14)),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Google',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: isGoogleLinked
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  isGoogleLinked ? '已連結 ✔' : '未連結',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isGoogleLinked
+                                        ? const Color(0xff059669)
+                                        : Colors.grey,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Apple
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isAppleLinked
+                                  ? const Color(0xffeffcf6)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isAppleLinked
+                                    ? const Color(0xff34d399)
+                                    : const Color(0xffdee2e6),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.apple, size: 16),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    'Apple',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: isAppleLinked
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  isAppleLinked ? '已連結 ✔' : '未連結',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isAppleLinked
+                                        ? const Color(0xff059669)
+                                        : Colors.grey,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 20),
+
           // Pets Summary
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '我的毛孩 (${pets.length} 隻)',
+                '我的寵物夥伴 (${pets.length} 隻)',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -350,7 +487,7 @@ class _UserProfileDialogState extends ConsumerState<UserProfileDialog> {
               OnboardingWizardDialog.show(context);
             },
             icon: const Icon(Icons.auto_awesome, color: Color(0xff4361ee)),
-            label: const Text('重新體驗新手註冊與毛孩綁定'),
+            label: const Text('重新體驗新手註冊與寵物綁定'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 12),
               side: const BorderSide(color: Color(0xff4361ee)),

@@ -127,7 +127,7 @@ class _OnboardingWizardDialogState
 
     if (petName.isEmpty) {
       setState(() {
-        _errorMessage = '請替你的第一隻毛孩取個名字';
+        _errorMessage = '請替你的第一隻寵物夥伴取個名字';
         _submitting = false;
       });
       return;
@@ -158,7 +158,7 @@ class _OnboardingWizardDialogState
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('🎉 歡迎踏入寵物世界！已登記首隻毛孩「$petName」'),
+            content: Text('🎉 歡迎踏入寵物世界！已登記首隻寵物「$petName」'),
             backgroundColor: const Color(0xff4361ee),
           ),
         );
@@ -205,7 +205,7 @@ class _OnboardingWizardDialogState
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🎉 歡迎加入！毛孩可隨時於個人資料或背包中綁定領養。'),
+            content: Text('🎉 歡迎加入！寵物夥伴可隨時於個人資料或背包中領養。'),
             backgroundColor: Color(0xff4361ee),
           ),
         );
@@ -257,7 +257,7 @@ class _OnboardingWizardDialogState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _step == 0 ? '設定主人身份' : '登記第一隻毛孩',
+                            _step == 0 ? '設定主人身份' : '登記第一隻寵物夥伴',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
@@ -265,7 +265,7 @@ class _OnboardingWizardDialogState
                             ),
                           ),
                           Text(
-                            _step == 0 ? '讓聊天室的朋友與寵物認識你' : '可選步驟：登記你的第一隻毛孩，或稍後再領養',
+                            _step == 0 ? '讓聊天室的朋友與寵物認識你' : '可選步驟：登記你的第一隻寵物夥伴，或稍後再領養',
                             style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xff6c757d),
@@ -359,7 +359,7 @@ class _OnboardingWizardDialogState
                               ),
                             )
                           : Text(
-                              _step == 0 ? '下一步：登記毛孩 ➔' : '完成註冊，踏入世界！ 🎉',
+                              _step == 0 ? '下一步：登記寵物 ➔' : '完成註冊，踏入世界！ 🎉',
                               style:
                                   const TextStyle(fontWeight: FontWeight.w700),
                             ),
@@ -485,7 +485,7 @@ class _OnboardingWizardDialogState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '毛孩物種',
+          '寵物物種',
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
@@ -507,7 +507,7 @@ class _OnboardingWizardDialogState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    '毛孩名字',
+                    '寵物名字',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 6),

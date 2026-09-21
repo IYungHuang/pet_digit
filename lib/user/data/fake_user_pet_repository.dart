@@ -120,7 +120,7 @@ class FakeUserPetRepository implements UserPetRepository {
         unreadCount: 0,
         active: true,
         updatedAt: now,
-        lastMessageText: '嗨！今天你的毛孩還好嗎？',
+        lastMessageText: '嗨！今天你的寵物夥伴還好嗎？',
         lastMessageSenderId: 'user_friend_1',
         lastMessageAt: now,
       ),

@@ -70,7 +70,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
     final breed = _petBreedController.text.trim();
 
     if (name.isEmpty) {
-      setState(() => _errorMessage = '請輸入毛孩名字');
+      setState(() => _errorMessage = '請輸入寵物名字');
       return;
     }
 
@@ -159,7 +159,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            '我的毛孩背包',
+                            '我的寵物背包',
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w800,
@@ -167,7 +167,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
                             ),
                           ),
                           Text(
-                            '管理名下所有毛孩，可自由指定預設出場主寵',
+                            '管理名下所有寵物夥伴，可自由指定預設出場主寵',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[600],
@@ -202,7 +202,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '擁有的毛孩 (${petsAsync.value?.length ?? 0})',
+                            '擁有的寵物夥伴 (${petsAsync.value?.length ?? 0})',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -212,7 +212,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
                             TextButton.icon(
                               icon: const Icon(Icons.add_circle_outline,
                                   size: 18),
-                              label: const Text('登記新毛孩'),
+                              label: const Text('登記新寵物'),
                               onPressed: () =>
                                   setState(() => _showAddForm = true),
                             ),
@@ -236,7 +236,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
                               child: Padding(
                                 padding: const EdgeInsets.all(32),
                                 child: Text(
-                                  '尚未登記任何毛孩',
+                                  '尚未登記任何寵物夥伴',
                                   style: TextStyle(color: Colors.grey[500]),
                                 ),
                               ),
@@ -364,7 +364,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
           ),
           IconButton(
             icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xff4361ee)),
-            tooltip: '編輯毛孩資料與頭像',
+            tooltip: '編輯寵物資料與頭像',
             onPressed: () => PetEditDialog.show(context, pet: pet),
           ),
           if (!isDefault) ...[
@@ -405,7 +405,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                '登記新毛孩',
+                '登記新寵物',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
               ),
               IconButton(
@@ -500,7 +500,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white),
                   )
-                : const Text('登記毛孩'),
+                : const Text('登記寵物'),
           ),
         ],
       ),

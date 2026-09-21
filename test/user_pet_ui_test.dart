@@ -54,19 +54,19 @@ void main() {
       expect(find.text('主人暱稱'), findsOneWidget);
 
       // Attempt next step with empty input -> validation error
-      await tester.tap(find.text('下一步：登記毛孩 ➔'));
+      await tester.tap(find.text('下一步：登記寵物 ➔'));
       await tester.pumpAndSettle();
       expect(find.text('請輸入主人暱稱'), findsOneWidget);
 
       // Fill in valid nickname and tag
       await tester.enterText(find.byType(TextField).first, '帥氣主人');
       await tester.enterText(find.byType(TextField).at(1), 'cool_owner');
-      await tester.tap(find.text('下一步：登記毛孩 ➔'));
+      await tester.tap(find.text('下一步：登記寵物 ➔'));
       await tester.pumpAndSettle();
 
       // Should now be on Step 2
-      expect(find.text('登記第一隻毛孩'), findsOneWidget);
-      expect(find.text('毛孩名字'), findsOneWidget);
+      expect(find.text('登記第一隻寵物夥伴'), findsOneWidget);
+      expect(find.text('寵物名字'), findsOneWidget);
     });
 
     testWidgets('skips pet binding and completes onboarding directly with later button',
@@ -87,7 +87,7 @@ void main() {
 
       await tester.enterText(find.byType(TextField).first, '獨立主人');
       await tester.enterText(find.byType(TextField).at(1), 'solo_owner');
-      await tester.tap(find.text('下一步：登記毛孩 ➔'));
+      await tester.tap(find.text('下一步：登記寵物 ➔'));
       await tester.pumpAndSettle();
 
       // Tap later button
@@ -98,7 +98,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Wizard dialog should be dismissed
-      expect(find.text('登記第一隻毛孩'), findsNothing);
+      expect(find.text('登記第一隻寵物夥伴'), findsNothing);
 
       final user = await fakeRepo.getUserProfile('me');
       expect(user?.nickname, '獨立主人');
@@ -122,7 +122,7 @@ void main() {
       await tester.tap(find.text('Open Backpack'));
       await tester.pumpAndSettle();
 
-      expect(find.text('我的毛孩背包'), findsOneWidget);
+      expect(find.text('我的寵物背包'), findsOneWidget);
       expect(find.text('阿福'), findsOneWidget);
       expect(find.text('咪咪'), findsOneWidget);
       expect(find.text('⭐ 預設主寵'), findsOneWidget);
@@ -155,7 +155,7 @@ void main() {
       await tester.tap(find.text('Open Summon'));
       await tester.pumpAndSettle();
 
-      expect(find.text('房間毛孩出動調度'), findsOneWidget);
+      expect(find.text('房間寵物出動調度'), findsOneWidget);
       expect(find.text('阿福'), findsOneWidget);
       expect(find.text('咪咪'), findsOneWidget);
 
@@ -228,8 +228,8 @@ void main() {
       await tester.tap(find.text('Open Edit Pet'));
       await tester.pumpAndSettle();
 
-      expect(find.text('編輯毛孩資料 - ${firstPet.name}'), findsOneWidget);
-      expect(find.text('毛孩名字'), findsOneWidget);
+      expect(find.text('編輯寵物資料 - ${firstPet.name}'), findsOneWidget);
+      expect(find.text('寵物名字'), findsOneWidget);
 
       // Modify name
       await tester.enterText(find.widgetWithText(TextField, firstPet.name), '超級阿福');
@@ -260,7 +260,7 @@ void main() {
       expect(find.text('Pixel Pals 冒險入口'), findsOneWidget);
       expect(find.text('Google 帳號'), findsOneWidget);
       expect(find.text('Apple 帳號'), findsOneWidget);
-      expect(find.text('立即登記首隻毛孩 (可選)'), findsOneWidget);
+      expect(find.text('立即登記首隻寵物夥伴 (可選)'), findsOneWidget);
 
       // Fill in registration
       await tester.enterText(find.byType(TextField).first, '冒險家小智');
@@ -277,6 +277,31 @@ void main() {
       final user = await fakeRepo.getUserProfile('me');
       expect(user?.nickname, '冒險家小智');
       expect(user?.searchTag, 'trainer_ash');
+    });
+
+    testWidgets('connects Google account and displays pet adoption flow',
+        (tester) async {
+      await tester.pumpWidget(
+        buildTestApp(const AuthScreen()),
+      );
+
+      // Tap Google account button
+      await tester.tap(find.text('Google 帳號'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Google 帳號已成功連結 ✔'), findsOneWidget);
+      expect(find.text('🎉 歡迎踏入數位寵物世界！'), findsOneWidget);
+      expect(find.text('🐾 馬上領養寵物夥伴並進入'), findsOneWidget);
+
+      // Enter pet name and adopt
+      await tester.enterText(
+          find.widgetWithText(TextField, '替牠取個名字（如：旺財、波波）'), '皮卡');
+      await tester.tap(find.text('🐾 馬上領養寵物夥伴並進入'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      final pets = await fakeRepo.getUserPets('me');
+      expect(pets.any((p) => p.name == '皮卡'), isTrue);
     });
   });
 }

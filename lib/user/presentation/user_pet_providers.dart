@@ -35,6 +35,18 @@ final currentUserIdProvider = Provider<String>((ref) {
   return auth?.currentUser?.uid ?? 'me';
 });
 
+final demoLinkedAccountsProvider =
+    StateProvider<List<String>>((ref) => <String>[]);
+
+final linkedProvidersProvider = Provider<List<String>>((ref) {
+  final auth = ref.watch(firebaseAuthProvider);
+  final user = auth?.currentUser;
+  if (user != null && user.providerData.isNotEmpty) {
+    return user.providerData.map((p) => p.providerId).toList();
+  }
+  return ref.watch(demoLinkedAccountsProvider);
+});
+
 final currentUserProfileProvider = StreamProvider<UserProfile?>((ref) {
   final repo = ref.watch(userPetRepositoryProvider);
   final uid = ref.watch(currentUserIdProvider);
