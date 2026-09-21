@@ -14,11 +14,13 @@ class PetWorldOverlay extends StatefulWidget {
     required this.room,
     required this.controller,
     this.controllers = const [],
+    this.focusedPetId,
   });
 
   final ChatRoom room;
   final PetWorldController controller;
   final List<PetWorldController> controllers;
+  final String? focusedPetId;
 
   List<PetWorldController> get allControllers =>
       controllers.isNotEmpty ? controllers : [controller];
@@ -227,7 +229,15 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
             decoration: BoxDecoration(
               color: const Color(0xdd1e2436),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0x66ffffff), width: 0.8),
+              border: Border.all(
+                color: (widget.focusedPetId == 'all' ||
+                        widget.focusedPetId == controller.id ||
+                        (widget.focusedPetId == 'primary' &&
+                            controller == widget.controller))
+                    ? const Color(0xffffd166)
+                    : const Color(0x66ffffff),
+                width: 1.0,
+              ),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x2a000000),
@@ -236,14 +246,27 @@ class _PetWorldOverlayState extends State<PetWorldOverlay>
                 ),
               ],
             ),
-            child: Text(
-              controller.name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.focusedPetId == 'all' ||
+                    widget.focusedPetId == controller.id ||
+                    (widget.focusedPetId == 'primary' &&
+                        controller == widget.controller))
+                  const Padding(
+                    padding: EdgeInsets.only(right: 2),
+                    child: Text('⭐', style: TextStyle(fontSize: 8)),
+                  ),
+                Text(
+                  controller.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

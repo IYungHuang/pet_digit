@@ -27,6 +27,7 @@ import '../../user/presentation/widgets/create_room_dialog.dart';
 import '../../user/presentation/widgets/my_pets_backpack_dialog.dart';
 import '../../user/presentation/widgets/onboarding_wizard_dialog.dart';
 import '../../user/presentation/widgets/room_pet_summon_dialog.dart';
+import '../../user/presentation/widgets/user_profile_dialog.dart';
 import '../../pet/domain/pet_profile.dart';
 import '../../pet/domain/pet_room_snapshot.dart';
 
@@ -51,6 +52,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
   Map<String, Rect> _lastBoundsMap = const {};
   Size _lastViewportSize = Size.zero;
   String? _lastPrimaryPetId;
+  var _activePetCommandId = 'primary';
   final _stackKey = GlobalKey();
   final _scrollController = ScrollController();
   final _composerController = TextEditingController();
@@ -168,6 +170,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
       _cardKeys.clear();
       _roomPetControllers.clear();
       _lastPrimaryPetId = null;
+      _activePetCommandId = 'primary';
       _lastMessageCount = 0;
       _hasNewMessages = false;
       _isNearBottom = true;
@@ -359,7 +362,17 @@ class _ChatShellState extends ConsumerState<ChatShell> {
 
   void _interact(ChatMessage message) {
     _syncBubbleBounds();
-    _world.interact(PetMessageTargetFactory.domainMessageId(message));
+    final targetId = PetMessageTargetFactory.domainMessageId(message);
+    if (_activePetCommandId == 'all' ||
+        _activePetCommandId == 'primary' ||
+        _activePetCommandId == _world.id) {
+      _world.interact(targetId);
+    }
+    for (final c in _roomPetControllers.values) {
+      if (_activePetCommandId == 'all' || _activePetCommandId == c.id) {
+        c.interact(targetId);
+      }
+    }
     setState(() {});
   }
 
@@ -520,7 +533,24 @@ class _ChatShellState extends ConsumerState<ChatShell> {
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 20,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: Center(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => UserProfileDialog.show(context),
+              child: const Tooltip(
+                message: '個人個人資料',
+                child: CircleAvatar(
+                  radius: 17,
+                  backgroundColor: Color(0x224361ee),
+                  child: Icon(Icons.person, size: 20, color: Color(0xff4361ee)),
+                ),
+              ),
+            ),
+          ),
+        ),
+        titleSpacing: 10,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -532,6 +562,53 @@ class _ChatShellState extends ConsumerState<ChatShell> {
           ],
         ),
         actions: [
+          PopupMenuButton<String>(
+            tooltip: '操作焦點毛孩',
+            icon: const Icon(Icons.touch_app_outlined, color: Color(0xff4361ee)),
+            onSelected: (val) => setState(() => _activePetCommandId = val),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'primary',
+                child: Row(
+                  children: [
+                    if (_activePetCommandId == 'primary')
+                      const Icon(Icons.check, size: 16, color: Color(0xff4361ee))
+                    else
+                      const SizedBox(width: 16),
+                    const SizedBox(width: 6),
+                    Text('⭐ ${_world.name.isNotEmpty ? _world.name : "預設主寵"}'),
+                  ],
+                ),
+              ),
+              for (final c in _roomPetControllers.values)
+                PopupMenuItem(
+                  value: c.id,
+                  child: Row(
+                    children: [
+                      if (_activePetCommandId == c.id)
+                        const Icon(Icons.check, size: 16, color: Color(0xff4361ee))
+                      else
+                        const SizedBox(width: 16),
+                      const SizedBox(width: 6),
+                      Text('🐾 ${c.name}'),
+                    ],
+                  ),
+                ),
+              PopupMenuItem(
+                value: 'all',
+                child: Row(
+                  children: [
+                    if (_activePetCommandId == 'all')
+                      const Icon(Icons.check, size: 16, color: Color(0xff4361ee))
+                    else
+                      const SizedBox(width: 16),
+                    const SizedBox(width: 6),
+                    const Text('🔥 全體毛孩一起動！'),
+                  ],
+                ),
+              ),
+            ],
+          ),
           IconButton(
             tooltip: '我的毛孩背包',
             icon: const Icon(Icons.backpack_outlined, color: Color(0xff4361ee)),
@@ -662,6 +739,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
                   room: _room,
                   controller: _world,
                   controllers: activeControllers,
+                  focusedPetId: _activePetCommandId,
                 ),
               ],
             ),

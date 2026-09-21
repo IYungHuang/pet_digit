@@ -35,7 +35,11 @@ class PetWorldController implements PetBehaviorRuntime {
     this.id = 'default',
     this.name = '',
     this.spawnOffset = const Offset(24, 24),
-  }) : position = spawnOffset;
+    double initialTime = 0.0,
+    double initialDirection = 1.0,
+  })  : position = spawnOffset,
+        _time = initialTime,
+        _walkDirection = initialDirection;
 
   String id;
   String name;
@@ -743,14 +747,16 @@ class PetWorldController implements PetBehaviorRuntime {
         state = PetState.walk;
         _time = 0;
       } else if (state == PetState.walk) {
+        final boundRight =
+            _viewportSize.width > 300 ? _viewportSize.width - 64 : 280.0;
         final nextX = position.dx + dt * 48 * _walkDirection;
-        if (nextX >= 280) {
+        if (nextX >= boundRight) {
           _walkDirection = -1;
         } else if (nextX <= 24) {
           _walkDirection = 1;
         }
         position = Offset(
-          (position.dx + dt * 48 * _walkDirection).clamp(24, 280),
+          (position.dx + dt * 48 * _walkDirection).clamp(24, boundRight),
           position.dy,
         );
         _handleFootsteps(dt, isRunning: false);
