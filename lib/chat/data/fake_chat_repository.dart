@@ -67,6 +67,13 @@ class FakeChatRepository {
     ),
   ];
 
-  static ChatRoom roomById(String id) =>
-      rooms.firstWhere((room) => room.id == id);
+  static ChatRoom roomById(String id) => rooms.firstWhere(
+        (room) => room.id == id,
+        orElse: () => ChatRoom(
+          id: id,
+          name: id,
+          subtitle: 'Active Room',
+          messages: const [],
+        ),
+      );
 }

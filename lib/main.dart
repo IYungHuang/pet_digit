@@ -8,7 +8,10 @@ Future<void> main() async {
   try {
     final environment = FirebaseEnvironment.fromDartDefine();
     await environment.initialize();
-    runApp(ChatPetApp(environment: environment));
+    runApp(ChatPetApp(
+      environment: environment,
+      autoShowOnboarding: true,
+    ));
   } catch (error) {
     runApp(FirebaseStartupFailureApp(message: error.toString()));
   }

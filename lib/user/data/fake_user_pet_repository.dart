@@ -115,7 +115,7 @@ class FakeUserPetRepository implements UserPetRepository {
       RoomSummary(
         roomId: defaultRoomId,
         type: RoomType.direct,
-        name: '波波小夥伴',
+        name: 'Pixel Pals',
         avatarUrl: 'assets/avatars/user_friend.png',
         unreadCount: 0,
         active: true,

@@ -11,9 +11,11 @@ class ChatPetApp extends StatelessWidget {
     this.environment = const FirebaseEnvironment(
       mode: FirebaseEnvironmentMode.fake,
     ),
+    this.autoShowOnboarding = false,
   });
 
   final FirebaseEnvironment environment;
+  final bool autoShowOnboarding;
 
   @override
   Widget build(BuildContext context) => ProviderScope(
@@ -29,7 +31,10 @@ class ChatPetApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xfff6f7fb),
         useMaterial3: true,
       ),
-      home: const ChatShell(showDemoAttachments: true),
+      home: ChatShell(
+        showDemoAttachments: true,
+        autoShowOnboarding: autoShowOnboarding,
+      ),
     ),
   );
 }

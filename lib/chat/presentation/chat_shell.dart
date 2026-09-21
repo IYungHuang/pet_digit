@@ -22,11 +22,21 @@ import '../application/media_picker_service.dart';
 import 'chat_providers.dart';
 import 'chat_timeline_policy.dart';
 import 'widgets/media_preview_dialog.dart';
+import '../../user/presentation/user_pet_providers.dart';
+import '../../user/presentation/widgets/create_room_dialog.dart';
+import '../../user/presentation/widgets/my_pets_backpack_dialog.dart';
+import '../../user/presentation/widgets/onboarding_wizard_dialog.dart';
+import '../../user/presentation/widgets/room_pet_summon_dialog.dart';
 
 class ChatShell extends ConsumerStatefulWidget {
-  const ChatShell({super.key, this.showDemoAttachments = false});
+  const ChatShell({
+    super.key,
+    this.showDemoAttachments = false,
+    this.autoShowOnboarding = false,
+  });
 
   final bool showDemoAttachments;
+  final bool autoShowOnboarding;
 
   @override
   ConsumerState<ChatShell> createState() => _ChatShellState();
@@ -46,6 +56,7 @@ class _ChatShellState extends ConsumerState<ChatShell> {
   var _isNearBottom = true;
   var _hasNewMessages = false;
   var _bubbleBoundsSyncScheduled = false;
+  var _checkedFirstTimeUser = false;
   final Set<String> _retryingClientIds = <String>{};
 
   ChatRoom get _room => FakeChatRepository.roomById(_activeRoomId);
@@ -394,6 +405,42 @@ class _ChatShellState extends ConsumerState<ChatShell> {
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncBubbleBounds());
 
+    final isFirstTime = ref.watch(isFirstTimeUserProvider);
+    if (widget.autoShowOnboarding && isFirstTime && !_checkedFirstTimeUser) {
+      _checkedFirstTimeUser = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) OnboardingWizardDialog.show(context);
+      });
+    }
+
+    final roomSummariesAsync = ref.watch(userRoomSummariesProvider);
+    final currentRooms = roomSummariesAsync.maybeWhen(
+      data: (summaries) {
+        if (summaries.isEmpty) return _rooms;
+        final list = <ChatRoom>[];
+        for (final s in summaries) {
+          final existingIndex = _rooms.indexWhere((r) => r.id == s.roomId);
+          if (existingIndex != -1) {
+            list.add(_rooms[existingIndex]);
+          } else {
+            list.add(ChatRoom(
+              id: s.roomId,
+              name: s.name,
+              subtitle: s.lastMessageText ?? '即時聊天室',
+              messages: const [],
+            ));
+          }
+        }
+        for (final r in _rooms) {
+          if (!list.any((item) => item.id == r.id)) {
+            list.add(r);
+          }
+        }
+        return list;
+      },
+      orElse: () => _rooms,
+    );
+
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 20,
@@ -408,6 +455,19 @@ class _ChatShellState extends ConsumerState<ChatShell> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: '我的毛孩背包',
+            icon: const Icon(Icons.backpack_outlined, color: Color(0xff4361ee)),
+            onPressed: () => MyPetsBackpackDialog.show(context),
+          ),
+          IconButton(
+            tooltip: '毛孩出動調度',
+            icon: const Icon(Icons.pets_rounded, color: Color(0xff4361ee)),
+            onPressed: () => RoomPetSummonDialog.show(
+              context,
+              roomId: _activeRoomId,
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 14),
             child: Center(
@@ -437,9 +497,13 @@ class _ChatShellState extends ConsumerState<ChatShell> {
       body: Column(
         children: [
           _RoomSelector(
-            rooms: _rooms,
+            rooms: currentRooms,
             activeRoomId: _activeRoomId,
             onSelected: _selectRoom,
+            onCreateRoom: () => CreateRoomDialog.show(
+              context,
+              onRoomCreated: _selectRoom,
+            ),
           ),
           _MembershipBanner(
             status: membershipStatus,
@@ -741,11 +805,13 @@ class _RoomSelector extends StatelessWidget {
     required this.rooms,
     required this.activeRoomId,
     required this.onSelected,
+    this.onCreateRoom,
   });
 
   final List<ChatRoom> rooms;
   final String activeRoomId;
   final ValueChanged<String> onSelected;
+  final VoidCallback? onCreateRoom;
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -753,9 +819,16 @@ class _RoomSelector extends StatelessWidget {
     child: ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       scrollDirection: Axis.horizontal,
-      itemCount: rooms.length,
+      itemCount: rooms.length + (onCreateRoom != null ? 1 : 0),
       separatorBuilder: (_, __) => const SizedBox(width: 8),
       itemBuilder: (context, index) {
+        if (index == rooms.length && onCreateRoom != null) {
+          return ActionChip(
+            avatar: const Icon(Icons.add, size: 16),
+            label: const Text('新增對話'),
+            onPressed: onCreateRoom,
+          );
+        }
         final room = rooms[index];
         return ChoiceChip(
           label: Text(room.name),
