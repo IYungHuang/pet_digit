@@ -125,5 +125,41 @@ void main() {
         ),
       );
     });
+
+    testWidgets(
+        'showImageSourceActionSheet presents camera and gallery options and returns camera on tap',
+        (tester) async {
+      ImageSource? selectedSource;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () async {
+                selectedSource =
+                    await ImageOptimizationService.showImageSourceActionSheet(
+                  context,
+                  title: '選擇生活照來源',
+                );
+              },
+              child: const Text('Open Sheet'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Sheet'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('選擇生活照來源'), findsOneWidget);
+      expect(find.text('拍照 (立即拍攝)'), findsOneWidget);
+      expect(find.text('從相簿選取'), findsOneWidget);
+      expect(find.text('取消'), findsOneWidget);
+
+      await tester.tap(find.text('拍照 (立即拍攝)'));
+      await tester.pumpAndSettle();
+
+      expect(selectedSource, ImageSource.camera);
+    });
   });
 }

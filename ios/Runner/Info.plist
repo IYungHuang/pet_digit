@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>需要使用您的相機來拍攝寵物的真實生活照與精彩瞬間</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>需要存取您的相片庫以選取寵物的美照並設置為代表頭像</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>需要使用您的麥克風來錄製寵物多媒體影音</string>
 </dict>
 </plist>

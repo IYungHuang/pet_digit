@@ -117,6 +117,130 @@ class ImageOptimizationService {
     return file;
   }
 
+  /// Displays an adaptive bottom sheet prompting the user to choose between
+  /// Camera (拍照) and Gallery (從相簿選取), then executes the image picking
+  /// and optimization process.
+  Future<XFile?> showImageSourcePickerAndPick(
+    BuildContext context, {
+    ImageOptimizationPreset preset = ImageOptimizationPreset.galleryPhoto,
+    String title = '上傳寵物生活照',
+  }) async {
+    final source = await showImageSourceActionSheet(context, title: title);
+    if (source == null) return null;
+    return pickOptimizedImage(source: source, preset: preset);
+  }
+
+  /// Displays a modern bottom sheet modal for choosing between Camera and Gallery.
+  static Future<ImageSource?> showImageSourceActionSheet(
+    BuildContext context, {
+    String title = '選擇照片來源',
+  }) {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xffdee2e6),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xff1f2030),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffeff2fe),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_rounded,
+                    color: Color(0xff4361ee),
+                    size: 22,
+                  ),
+                ),
+                title: const Text(
+                  '拍照 (立即拍攝)',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                subtitle: const Text(
+                  '開啟相機鏡頭，拍攝家中毛孩生活照',
+                  style: TextStyle(fontSize: 12, color: Color(0xff6c757d)),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xfff0fdf4),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library_rounded,
+                    color: Color(0xff16a34a),
+                    size: 22,
+                  ),
+                ),
+                title: const Text(
+                  '從相簿選取',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                subtitle: const Text(
+                  '從手機相簿選取已拍攝的生活美照',
+                  style: TextStyle(fontSize: 12, color: Color(0xff6c757d)),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onPressed: () => Navigator.of(ctx).pop(null),
+                child: const Text('取消', style: TextStyle(color: Color(0xff6c757d))),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Calculates safe GPU decode cache dimensions according to device pixel ratio.
   /// Prevents full uncompressed bitmap allocation in heap memory.
   static int calculateCacheDimension(

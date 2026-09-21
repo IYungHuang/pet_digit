@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../chat/presentation/chat_shell.dart';
 import '../../../common/services/image_optimization_service.dart';
@@ -62,9 +61,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   Future<void> _pickCustomAvatar() async {
     try {
       final service = ImageOptimizationService();
-      final image = await service.pickOptimizedImage(
-        source: ImageSource.gallery,
+      final image = await service.showImageSourcePickerAndPick(
+        context,
         preset: ImageOptimizationPreset.avatar,
+        title: '設定寵物代表頭像',
       );
       if (image != null && mounted) {
         setState(() {
@@ -702,9 +702,10 @@ class _ThirdPartyConnectedPetDialogState
   Future<void> _pickPetPhoto() async {
     try {
       final service = ImageOptimizationService();
-      final image = await service.pickOptimizedImage(
-        source: ImageSource.gallery,
+      final image = await service.showImageSourcePickerAndPick(
+        context,
         preset: ImageOptimizationPreset.galleryPhoto,
+        title: '上傳現實寵物生活照',
       );
       if (image != null && mounted) {
         setState(() {

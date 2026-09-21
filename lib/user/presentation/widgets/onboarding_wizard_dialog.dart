@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../common/services/image_optimization_service.dart';
 import '../../../pet/domain/pet_profile.dart';
@@ -102,9 +101,10 @@ class _OnboardingWizardDialogState
   Future<void> _pickPetPhoto() async {
     try {
       final service = ImageOptimizationService();
-      final image = await service.pickOptimizedImage(
-        source: ImageSource.gallery,
+      final image = await service.showImageSourcePickerAndPick(
+        context,
         preset: ImageOptimizationPreset.galleryPhoto,
+        title: '為首隻夥伴上傳生活照',
       );
       if (image != null && mounted) {
         setState(() {
