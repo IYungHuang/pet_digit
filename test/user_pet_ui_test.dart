@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:chat_pet_mvp/user/data/fake_user_pet_repository.dart';
 import 'package:chat_pet_mvp/user/presentation/user_pet_providers.dart';
+import 'package:chat_pet_mvp/user/presentation/screens/auth_screen.dart';
 import 'package:chat_pet_mvp/user/presentation/widgets/create_room_dialog.dart';
 import 'package:chat_pet_mvp/user/presentation/widgets/my_pets_backpack_dialog.dart';
 import 'package:chat_pet_mvp/user/presentation/widgets/onboarding_wizard_dialog.dart';
+import 'package:chat_pet_mvp/user/presentation/widgets/pet_edit_dialog.dart';
 import 'package:chat_pet_mvp/user/presentation/widgets/room_pet_summon_dialog.dart';
 
 void main() {
@@ -65,6 +67,42 @@ void main() {
       // Should now be on Step 2
       expect(find.text('登記第一隻毛孩'), findsOneWidget);
       expect(find.text('毛孩名字'), findsOneWidget);
+    });
+
+    testWidgets('skips pet binding and completes onboarding directly with later button',
+        (tester) async {
+      await tester.pumpWidget(
+        buildTestApp(
+          Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () => OnboardingWizardDialog.show(context),
+              child: const Text('Open Wizard'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Wizard'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, '獨立主人');
+      await tester.enterText(find.byType(TextField).at(1), 'solo_owner');
+      await tester.tap(find.text('下一步：登記毛孩 ➔'));
+      await tester.pumpAndSettle();
+
+      // Tap later button
+      final laterButton = find.text('稍後再綁定 (先去逛逛)');
+      expect(laterButton, findsOneWidget);
+      await tester.ensureVisible(laterButton);
+      await tester.tap(laterButton);
+      await tester.pumpAndSettle();
+
+      // Wizard dialog should be dismissed
+      expect(find.text('登記第一隻毛孩'), findsNothing);
+
+      final user = await fakeRepo.getUserProfile('me');
+      expect(user?.nickname, '獨立主人');
+      expect(user?.searchTag, 'solo_owner');
     });
   });
 
@@ -167,6 +205,78 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(createdRoomId, 'dm_me_user_friend_1');
+    });
+  });
+
+  group('PetEditDialog Widget Tests', () {
+    testWidgets('edits pet name and personality and saves successfully',
+        (tester) async {
+      final pets = await fakeRepo.getUserPets('me');
+      final firstPet = pets.first;
+
+      await tester.pumpWidget(
+        buildTestApp(
+          Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () => PetEditDialog.show(context, pet: firstPet),
+              child: const Text('Open Edit Pet'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Edit Pet'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('編輯毛孩資料 - ${firstPet.name}'), findsOneWidget);
+      expect(find.text('毛孩名字'), findsOneWidget);
+
+      // Modify name
+      await tester.enterText(find.widgetWithText(TextField, firstPet.name), '超級阿福');
+      await tester.pumpAndSettle();
+
+      // Tap personality chip
+      await tester.tap(find.text('好奇寶寶 🔍'));
+      await tester.pumpAndSettle();
+
+      // Tap save button
+      await tester.tap(find.text('儲存更新'));
+      await tester.pumpAndSettle();
+
+      // Verify update in repo
+      final updatedPets = await fakeRepo.getUserPets('me');
+      final updated = updatedPets.firstWhere((p) => p.petId == firstPet.petId);
+      expect(updated.name, '超級阿福');
+      expect(updated.personality, 'curious');
+    });
+  });
+
+  group('AuthScreen Widget Tests', () {
+    testWidgets('renders social buttons and registers new user', (tester) async {
+      await tester.pumpWidget(
+        buildTestApp(const AuthScreen()),
+      );
+
+      expect(find.text('Pixel Pals 冒險入口'), findsOneWidget);
+      expect(find.text('Google 帳號'), findsOneWidget);
+      expect(find.text('Apple 帳號'), findsOneWidget);
+      expect(find.text('立即登記首隻毛孩 (可選)'), findsOneWidget);
+
+      // Fill in registration
+      await tester.enterText(find.byType(TextField).first, '冒險家小智');
+      await tester.enterText(find.byType(TextField).at(1), 'trainer_ash');
+      await tester.pumpAndSettle();
+
+      // Register without pet
+      final submitButton = find.text('完成身分登記，直接進入 🚀');
+      await tester.ensureVisible(submitButton);
+      await tester.tap(submitButton);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      final user = await fakeRepo.getUserProfile('me');
+      expect(user?.nickname, '冒險家小智');
+      expect(user?.searchTag, 'trainer_ash');
     });
   });
 }

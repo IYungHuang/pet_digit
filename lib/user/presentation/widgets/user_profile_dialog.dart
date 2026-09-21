@@ -6,6 +6,7 @@ import '../../../pet/domain/pet_profile.dart';
 import '../user_pet_providers.dart';
 import 'my_pets_backpack_dialog.dart';
 import 'onboarding_wizard_dialog.dart';
+import '../screens/auth_screen.dart';
 
 class UserProfileDialog extends ConsumerStatefulWidget {
   const UserProfileDialog({super.key});
@@ -330,6 +331,19 @@ class _UserProfileDialogState extends ConsumerState<UserProfileDialog> {
           const SizedBox(height: 24),
 
           // Quick Action Buttons
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(AuthScreen.route());
+            },
+            icon: const Icon(Icons.login_rounded, color: Color(0xff4361ee)),
+            label: const Text('前往獨立註冊與社群登入頁面'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              side: const BorderSide(color: Color(0xff4361ee)),
+            ),
+          ),
+          const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () {
               Navigator.of(context).pop();

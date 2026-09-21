@@ -173,6 +173,53 @@ class _OnboardingWizardDialogState
     }
   }
 
+  Future<void> _submitWithoutPet() async {
+    final nickname = _nicknameController.text.trim();
+    final tag = _searchTagController.text.trim();
+
+    if (nickname.isEmpty) {
+      setState(() => _errorMessage = '請輸入主人暱稱');
+      return;
+    }
+    if (tag.length < 3 || !RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(tag)) {
+      setState(() => _errorMessage = '帳號標籤需為 3~20 字元的英文字母、數字或底線');
+      return;
+    }
+
+    setState(() {
+      _errorMessage = null;
+      _submitting = true;
+    });
+
+    try {
+      final repo = ref.read(userPetRepositoryProvider);
+
+      // 1. Upsert User Profile without pet
+      await repo.upsertUserProfile(
+        nickname: nickname,
+        avatarUrl: _selectedUserAvatar,
+        searchTag: tag,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 歡迎加入！毛孩可隨時於個人資料或背包中綁定領養。'),
+            backgroundColor: Color(0xff4361ee),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -218,7 +265,7 @@ class _OnboardingWizardDialogState
                             ),
                           ),
                           Text(
-                            _step == 0 ? '讓聊天室的朋友與寵物認識你' : '剛性需求：聊天室需要你的專屬寵物一同出遊',
+                            _step == 0 ? '讓聊天室的朋友與寵物認識你' : '可選步驟：登記你的第一隻毛孩，或稍後再領養',
                             style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xff6c757d),
@@ -286,23 +333,15 @@ class _OnboardingWizardDialogState
                 const SizedBox(height: 24),
 
                 // Footer Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (_step == 1)
-                      TextButton(
-                        onPressed: _submitting
-                            ? null
-                            : () => setState(() => _step = 0),
-                        child: const Text('上一步'),
-                      ),
-                    const SizedBox(width: 10),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xff4361ee),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 22, vertical: 12),
+                            horizontal: 20, vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -325,6 +364,30 @@ class _OnboardingWizardDialogState
                                   const TextStyle(fontWeight: FontWeight.w700),
                             ),
                     ),
+                    if (_step == 1) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                            onPressed: _submitting
+                                ? null
+                                : () => setState(() => _step = 0),
+                            child: const Text('上一步'),
+                          ),
+                          TextButton(
+                            onPressed: _submitting ? null : _submitWithoutPet,
+                            child: const Text(
+                              '稍後再綁定 (先去逛逛)',
+                              style: TextStyle(
+                                color: Color(0xff6c757d),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ],

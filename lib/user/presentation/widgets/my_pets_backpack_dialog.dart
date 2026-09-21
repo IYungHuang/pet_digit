@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../pet/domain/pet_profile.dart';
 import '../user_pet_providers.dart';
+import 'pet_edit_dialog.dart';
 
 class MyPetsBackpackDialog extends ConsumerStatefulWidget {
   const MyPetsBackpackDialog({super.key});
@@ -361,7 +362,13 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
               ],
             ),
           ),
-          if (!isDefault)
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xff4361ee)),
+            tooltip: '編輯毛孩資料與頭像',
+            onPressed: () => PetEditDialog.show(context, pet: pet),
+          ),
+          if (!isDefault) ...[
+            const SizedBox(width: 4),
             OutlinedButton(
               style: OutlinedButton.styleFrom(
                 padding:
@@ -377,6 +384,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
+          ],
         ],
       ),
     );
