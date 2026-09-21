@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$UserProfile {
 
- String get uid; String get nickname; String get avatarUrl; String get searchTag; String get searchTagLower; String get defaultPetId;@FlexibleDateTimeConverter() DateTime get createdAt;@FlexibleDateTimeConverter() DateTime get updatedAt;
+ String get uid; String get nickname; String get avatarUrl; String get searchTag; String get searchTagLower; String get defaultPetId; int get basePetSlots; int get invitedBonusSlots; int get paidBonusSlots;@FlexibleDateTimeConverter() DateTime get createdAt;@FlexibleDateTimeConverter() DateTime get updatedAt;
 /// Create a copy of UserProfile
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $UserProfileCopyWith<UserProfile> get copyWith => _$UserProfileCopyWithImpl<User
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is UserProfile&&(identical(other.uid, uid) || other.uid == uid)&&(identical(other.nickname, nickname) || other.nickname == nickname)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.searchTag, searchTag) || other.searchTag == searchTag)&&(identical(other.searchTagLower, searchTagLower) || other.searchTagLower == searchTagLower)&&(identical(other.defaultPetId, defaultPetId) || other.defaultPetId == defaultPetId)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is UserProfile&&(identical(other.uid, uid) || other.uid == uid)&&(identical(other.nickname, nickname) || other.nickname == nickname)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.searchTag, searchTag) || other.searchTag == searchTag)&&(identical(other.searchTagLower, searchTagLower) || other.searchTagLower == searchTagLower)&&(identical(other.defaultPetId, defaultPetId) || other.defaultPetId == defaultPetId)&&(identical(other.basePetSlots, basePetSlots) || other.basePetSlots == basePetSlots)&&(identical(other.invitedBonusSlots, invitedBonusSlots) || other.invitedBonusSlots == invitedBonusSlots)&&(identical(other.paidBonusSlots, paidBonusSlots) || other.paidBonusSlots == paidBonusSlots)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,uid,nickname,avatarUrl,searchTag,searchTagLower,defaultPetId,createdAt,updatedAt);
+int get hashCode => Object.hash(runtimeType,uid,nickname,avatarUrl,searchTag,searchTagLower,defaultPetId,basePetSlots,invitedBonusSlots,paidBonusSlots,createdAt,updatedAt);
 
 @override
 String toString() {
-  return 'UserProfile(uid: $uid, nickname: $nickname, avatarUrl: $avatarUrl, searchTag: $searchTag, searchTagLower: $searchTagLower, defaultPetId: $defaultPetId, createdAt: $createdAt, updatedAt: $updatedAt)';
+  return 'UserProfile(uid: $uid, nickname: $nickname, avatarUrl: $avatarUrl, searchTag: $searchTag, searchTagLower: $searchTagLower, defaultPetId: $defaultPetId, basePetSlots: $basePetSlots, invitedBonusSlots: $invitedBonusSlots, paidBonusSlots: $paidBonusSlots, createdAt: $createdAt, updatedAt: $updatedAt)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $UserProfileCopyWith<$Res>  {
   factory $UserProfileCopyWith(UserProfile value, $Res Function(UserProfile) _then) = _$UserProfileCopyWithImpl;
 @useResult
 $Res call({
- String uid, String nickname, String avatarUrl, String searchTag, String searchTagLower, String defaultPetId,@FlexibleDateTimeConverter() DateTime createdAt,@FlexibleDateTimeConverter() DateTime updatedAt
+ String uid, String nickname, String avatarUrl, String searchTag, String searchTagLower, String defaultPetId, int basePetSlots, int invitedBonusSlots, int paidBonusSlots,@FlexibleDateTimeConverter() DateTime createdAt,@FlexibleDateTimeConverter() DateTime updatedAt
 });
 
 
@@ -65,7 +65,7 @@ class _$UserProfileCopyWithImpl<$Res>
 
 /// Create a copy of UserProfile
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? uid = null,Object? nickname = null,Object? avatarUrl = null,Object? searchTag = null,Object? searchTagLower = null,Object? defaultPetId = null,Object? createdAt = null,Object? updatedAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? uid = null,Object? nickname = null,Object? avatarUrl = null,Object? searchTag = null,Object? searchTagLower = null,Object? defaultPetId = null,Object? basePetSlots = null,Object? invitedBonusSlots = null,Object? paidBonusSlots = null,Object? createdAt = null,Object? updatedAt = null,}) {
   return _then(_self.copyWith(
 uid: null == uid ? _self.uid : uid // ignore: cast_nullable_to_non_nullable
 as String,nickname: null == nickname ? _self.nickname : nickname // ignore: cast_nullable_to_non_nullable
@@ -73,7 +73,10 @@ as String,avatarUrl: null == avatarUrl ? _self.avatarUrl : avatarUrl // ignore: 
 as String,searchTag: null == searchTag ? _self.searchTag : searchTag // ignore: cast_nullable_to_non_nullable
 as String,searchTagLower: null == searchTagLower ? _self.searchTagLower : searchTagLower // ignore: cast_nullable_to_non_nullable
 as String,defaultPetId: null == defaultPetId ? _self.defaultPetId : defaultPetId // ignore: cast_nullable_to_non_nullable
-as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as String,basePetSlots: null == basePetSlots ? _self.basePetSlots : basePetSlots // ignore: cast_nullable_to_non_nullable
+as int,invitedBonusSlots: null == invitedBonusSlots ? _self.invitedBonusSlots : invitedBonusSlots // ignore: cast_nullable_to_non_nullable
+as int,paidBonusSlots: null == paidBonusSlots ? _self.paidBonusSlots : paidBonusSlots // ignore: cast_nullable_to_non_nullable
+as int,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as DateTime,
   ));
@@ -160,10 +163,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String uid,  String nickname,  String avatarUrl,  String searchTag,  String searchTagLower,  String defaultPetId, @FlexibleDateTimeConverter()  DateTime createdAt, @FlexibleDateTimeConverter()  DateTime updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String uid,  String nickname,  String avatarUrl,  String searchTag,  String searchTagLower,  String defaultPetId,  int basePetSlots,  int invitedBonusSlots,  int paidBonusSlots, @FlexibleDateTimeConverter()  DateTime createdAt, @FlexibleDateTimeConverter()  DateTime updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _UserProfile() when $default != null:
-return $default(_that.uid,_that.nickname,_that.avatarUrl,_that.searchTag,_that.searchTagLower,_that.defaultPetId,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.uid,_that.nickname,_that.avatarUrl,_that.searchTag,_that.searchTagLower,_that.defaultPetId,_that.basePetSlots,_that.invitedBonusSlots,_that.paidBonusSlots,_that.createdAt,_that.updatedAt);case _:
   return orElse();
 
 }
@@ -181,10 +184,10 @@ return $default(_that.uid,_that.nickname,_that.avatarUrl,_that.searchTag,_that.s
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String uid,  String nickname,  String avatarUrl,  String searchTag,  String searchTagLower,  String defaultPetId, @FlexibleDateTimeConverter()  DateTime createdAt, @FlexibleDateTimeConverter()  DateTime updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String uid,  String nickname,  String avatarUrl,  String searchTag,  String searchTagLower,  String defaultPetId,  int basePetSlots,  int invitedBonusSlots,  int paidBonusSlots, @FlexibleDateTimeConverter()  DateTime createdAt, @FlexibleDateTimeConverter()  DateTime updatedAt)  $default,) {final _that = this;
 switch (_that) {
 case _UserProfile():
-return $default(_that.uid,_that.nickname,_that.avatarUrl,_that.searchTag,_that.searchTagLower,_that.defaultPetId,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.uid,_that.nickname,_that.avatarUrl,_that.searchTag,_that.searchTagLower,_that.defaultPetId,_that.basePetSlots,_that.invitedBonusSlots,_that.paidBonusSlots,_that.createdAt,_that.updatedAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -201,10 +204,10 @@ return $default(_that.uid,_that.nickname,_that.avatarUrl,_that.searchTag,_that.s
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String uid,  String nickname,  String avatarUrl,  String searchTag,  String searchTagLower,  String defaultPetId, @FlexibleDateTimeConverter()  DateTime createdAt, @FlexibleDateTimeConverter()  DateTime updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String uid,  String nickname,  String avatarUrl,  String searchTag,  String searchTagLower,  String defaultPetId,  int basePetSlots,  int invitedBonusSlots,  int paidBonusSlots, @FlexibleDateTimeConverter()  DateTime createdAt, @FlexibleDateTimeConverter()  DateTime updatedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _UserProfile() when $default != null:
-return $default(_that.uid,_that.nickname,_that.avatarUrl,_that.searchTag,_that.searchTagLower,_that.defaultPetId,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.uid,_that.nickname,_that.avatarUrl,_that.searchTag,_that.searchTagLower,_that.defaultPetId,_that.basePetSlots,_that.invitedBonusSlots,_that.paidBonusSlots,_that.createdAt,_that.updatedAt);case _:
   return null;
 
 }
@@ -215,8 +218,8 @@ return $default(_that.uid,_that.nickname,_that.avatarUrl,_that.searchTag,_that.s
 /// @nodoc
 @JsonSerializable()
 
-class _UserProfile implements UserProfile {
-  const _UserProfile({required this.uid, required this.nickname, required this.avatarUrl, required this.searchTag, required this.searchTagLower, this.defaultPetId = '', @FlexibleDateTimeConverter() required this.createdAt, @FlexibleDateTimeConverter() required this.updatedAt});
+class _UserProfile extends UserProfile {
+  const _UserProfile({required this.uid, required this.nickname, required this.avatarUrl, required this.searchTag, required this.searchTagLower, this.defaultPetId = '', this.basePetSlots = 1, this.invitedBonusSlots = 0, this.paidBonusSlots = 0, @FlexibleDateTimeConverter() required this.createdAt, @FlexibleDateTimeConverter() required this.updatedAt}): super._();
   factory _UserProfile.fromJson(Map<String, dynamic> json) => _$UserProfileFromJson(json);
 
 @override final  String uid;
@@ -225,6 +228,9 @@ class _UserProfile implements UserProfile {
 @override final  String searchTag;
 @override final  String searchTagLower;
 @override@JsonKey() final  String defaultPetId;
+@override@JsonKey() final  int basePetSlots;
+@override@JsonKey() final  int invitedBonusSlots;
+@override@JsonKey() final  int paidBonusSlots;
 @override@FlexibleDateTimeConverter() final  DateTime createdAt;
 @override@FlexibleDateTimeConverter() final  DateTime updatedAt;
 
@@ -241,16 +247,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UserProfile&&(identical(other.uid, uid) || other.uid == uid)&&(identical(other.nickname, nickname) || other.nickname == nickname)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.searchTag, searchTag) || other.searchTag == searchTag)&&(identical(other.searchTagLower, searchTagLower) || other.searchTagLower == searchTagLower)&&(identical(other.defaultPetId, defaultPetId) || other.defaultPetId == defaultPetId)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UserProfile&&(identical(other.uid, uid) || other.uid == uid)&&(identical(other.nickname, nickname) || other.nickname == nickname)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.searchTag, searchTag) || other.searchTag == searchTag)&&(identical(other.searchTagLower, searchTagLower) || other.searchTagLower == searchTagLower)&&(identical(other.defaultPetId, defaultPetId) || other.defaultPetId == defaultPetId)&&(identical(other.basePetSlots, basePetSlots) || other.basePetSlots == basePetSlots)&&(identical(other.invitedBonusSlots, invitedBonusSlots) || other.invitedBonusSlots == invitedBonusSlots)&&(identical(other.paidBonusSlots, paidBonusSlots) || other.paidBonusSlots == paidBonusSlots)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,uid,nickname,avatarUrl,searchTag,searchTagLower,defaultPetId,createdAt,updatedAt);
+int get hashCode => Object.hash(runtimeType,uid,nickname,avatarUrl,searchTag,searchTagLower,defaultPetId,basePetSlots,invitedBonusSlots,paidBonusSlots,createdAt,updatedAt);
 
 @override
 String toString() {
-  return 'UserProfile(uid: $uid, nickname: $nickname, avatarUrl: $avatarUrl, searchTag: $searchTag, searchTagLower: $searchTagLower, defaultPetId: $defaultPetId, createdAt: $createdAt, updatedAt: $updatedAt)';
+  return 'UserProfile(uid: $uid, nickname: $nickname, avatarUrl: $avatarUrl, searchTag: $searchTag, searchTagLower: $searchTagLower, defaultPetId: $defaultPetId, basePetSlots: $basePetSlots, invitedBonusSlots: $invitedBonusSlots, paidBonusSlots: $paidBonusSlots, createdAt: $createdAt, updatedAt: $updatedAt)';
 }
 
 
@@ -261,7 +267,7 @@ abstract mixin class _$UserProfileCopyWith<$Res> implements $UserProfileCopyWith
   factory _$UserProfileCopyWith(_UserProfile value, $Res Function(_UserProfile) _then) = __$UserProfileCopyWithImpl;
 @override @useResult
 $Res call({
- String uid, String nickname, String avatarUrl, String searchTag, String searchTagLower, String defaultPetId,@FlexibleDateTimeConverter() DateTime createdAt,@FlexibleDateTimeConverter() DateTime updatedAt
+ String uid, String nickname, String avatarUrl, String searchTag, String searchTagLower, String defaultPetId, int basePetSlots, int invitedBonusSlots, int paidBonusSlots,@FlexibleDateTimeConverter() DateTime createdAt,@FlexibleDateTimeConverter() DateTime updatedAt
 });
 
 
@@ -278,7 +284,7 @@ class __$UserProfileCopyWithImpl<$Res>
 
 /// Create a copy of UserProfile
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? uid = null,Object? nickname = null,Object? avatarUrl = null,Object? searchTag = null,Object? searchTagLower = null,Object? defaultPetId = null,Object? createdAt = null,Object? updatedAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? uid = null,Object? nickname = null,Object? avatarUrl = null,Object? searchTag = null,Object? searchTagLower = null,Object? defaultPetId = null,Object? basePetSlots = null,Object? invitedBonusSlots = null,Object? paidBonusSlots = null,Object? createdAt = null,Object? updatedAt = null,}) {
   return _then(_UserProfile(
 uid: null == uid ? _self.uid : uid // ignore: cast_nullable_to_non_nullable
 as String,nickname: null == nickname ? _self.nickname : nickname // ignore: cast_nullable_to_non_nullable
@@ -286,7 +292,10 @@ as String,avatarUrl: null == avatarUrl ? _self.avatarUrl : avatarUrl // ignore: 
 as String,searchTag: null == searchTag ? _self.searchTag : searchTag // ignore: cast_nullable_to_non_nullable
 as String,searchTagLower: null == searchTagLower ? _self.searchTagLower : searchTagLower // ignore: cast_nullable_to_non_nullable
 as String,defaultPetId: null == defaultPetId ? _self.defaultPetId : defaultPetId // ignore: cast_nullable_to_non_nullable
-as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as String,basePetSlots: null == basePetSlots ? _self.basePetSlots : basePetSlots // ignore: cast_nullable_to_non_nullable
+as int,invitedBonusSlots: null == invitedBonusSlots ? _self.invitedBonusSlots : invitedBonusSlots // ignore: cast_nullable_to_non_nullable
+as int,paidBonusSlots: null == paidBonusSlots ? _self.paidBonusSlots : paidBonusSlots // ignore: cast_nullable_to_non_nullable
+as int,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as DateTime,
   ));

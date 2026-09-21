@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:chat_pet_mvp/pet/domain/pet_profile.dart';
 import 'package:chat_pet_mvp/user/data/fake_user_pet_repository.dart';
 import 'package:chat_pet_mvp/user/presentation/user_pet_providers.dart';
 import 'package:chat_pet_mvp/user/presentation/screens/auth_screen.dart';
@@ -108,6 +109,14 @@ void main() {
 
   group('MyPetsBackpackDialog Widget Tests', () {
     testWidgets('displays owned pets and default badge', (tester) async {
+      await fakeRepo.unlockBonusPetSlot(reason: 'invite');
+      final cat = await fakeRepo.registerPet(
+        name: '咪咪',
+        species: PetSpecies.cat,
+        breed: 'british_shorthair',
+        avatarUrl: 'assets/pets/cat_real.png',
+      );
+
       await tester.pumpWidget(
         buildTestApp(
           Builder(
@@ -134,12 +143,56 @@ void main() {
       await tester.pumpAndSettle();
 
       final updatedProfile = await fakeRepo.getUserProfile('me');
-      expect(updatedProfile!.defaultPetId, 'pet_cat_1');
+      expect(updatedProfile!.defaultPetId, cat.petId);
+    });
+
+    testWidgets('displays slot limit and allows unlock via invite share',
+        (tester) async {
+      await tester.pumpWidget(
+        buildTestApp(
+          Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () => MyPetsBackpackDialog.show(context),
+              child: const Text('Open Backpack'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Backpack'));
+      await tester.pumpAndSettle();
+
+      // Initially 1/1, shows limit badge
+      expect(find.text('欄位已滿'), findsOneWidget);
+      expect(find.text('基礎 1 隻 · 邀請獎勵 +0 · 付費擴增 +0'), findsOneWidget);
+
+      // Tap 登記新寵物 -> opens slot limit dialog
+      await tester.tap(find.text('登記新寵物'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('寵物欄位已達上限 (1 / 1)'), findsOneWidget);
+      expect(find.text('🔗 分享邀請好友（解鎖 +1 欄位）'), findsOneWidget);
+
+      // Tap unlock button
+      await tester.tap(find.text('🔗 分享邀請好友（解鎖 +1 欄位）'));
+      await tester.pumpAndSettle();
+
+      // Profile slots increased to 2
+      final profile = await fakeRepo.getUserProfile('me');
+      expect(profile!.maxPetSlots, 2);
     });
   });
 
   group('RoomPetSummonDialog Widget Tests', () {
     testWidgets('toggles pet selection for room', (tester) async {
+      await fakeRepo.unlockBonusPetSlot(reason: 'invite');
+      await fakeRepo.registerPet(
+        name: '咪咪',
+        species: PetSpecies.cat,
+        breed: 'british_shorthair',
+        avatarUrl: 'assets/pets/cat_real.png',
+      );
+
       await tester.pumpWidget(
         buildTestApp(
           Builder(
@@ -281,6 +334,7 @@ void main() {
 
     testWidgets('connects Google account and displays pet adoption flow',
         (tester) async {
+      fakeRepo.currentUid = 'new_google_user';
       await tester.pumpWidget(
         buildTestApp(const AuthScreen()),
       );
@@ -303,7 +357,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
-      final pets = await fakeRepo.getUserPets('me');
+      final pets = await fakeRepo.getUserPets('new_google_user');
       expect(pets.any((p) => p.name == '皮卡'), isTrue);
     });
 

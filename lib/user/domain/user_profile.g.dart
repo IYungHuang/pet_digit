@@ -13,6 +13,9 @@ _UserProfile _$UserProfileFromJson(Map<String, dynamic> json) => _UserProfile(
   searchTag: json['searchTag'] as String,
   searchTagLower: json['searchTagLower'] as String,
   defaultPetId: json['defaultPetId'] as String? ?? '',
+  basePetSlots: (json['basePetSlots'] as num?)?.toInt() ?? 1,
+  invitedBonusSlots: (json['invitedBonusSlots'] as num?)?.toInt() ?? 0,
+  paidBonusSlots: (json['paidBonusSlots'] as num?)?.toInt() ?? 0,
   createdAt: const FlexibleDateTimeConverter().fromJson(json['createdAt']),
   updatedAt: const FlexibleDateTimeConverter().fromJson(json['updatedAt']),
 );
@@ -25,6 +28,9 @@ Map<String, dynamic> _$UserProfileToJson(_UserProfile instance) =>
       'searchTag': instance.searchTag,
       'searchTagLower': instance.searchTagLower,
       'defaultPetId': instance.defaultPetId,
+      'basePetSlots': instance.basePetSlots,
+      'invitedBonusSlots': instance.invitedBonusSlots,
+      'paidBonusSlots': instance.paidBonusSlots,
       'createdAt': const FlexibleDateTimeConverter().toJson(instance.createdAt),
       'updatedAt': const FlexibleDateTimeConverter().toJson(instance.updatedAt),
     };

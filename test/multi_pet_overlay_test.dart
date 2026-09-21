@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:chat_pet_mvp/chat/domain/chat_models.dart';
+import 'package:chat_pet_mvp/pet/domain/pet_profile.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_world.dart';
 import 'package:chat_pet_mvp/pet/domain/pet_world_controller.dart';
 import 'package:chat_pet_mvp/pet/presentation/pet_world_overlay.dart';
@@ -145,10 +146,19 @@ void main() {
       expect(find.text('阿福'), findsOneWidget);
       expect(find.text('波波'), findsOneWidget);
 
+      // Unlock bonus slot and register 咪咪
+      await fakeRepo.unlockBonusPetSlot(reason: 'invite');
+      final cat = await fakeRepo.registerPet(
+        name: '咪咪',
+        species: PetSpecies.cat,
+        breed: 'british_shorthair',
+        avatarUrl: 'assets/pets/cat_real.png',
+      );
+
       // Now summon 咪咪 as well
       await fakeRepo.updateRoomPets(
         roomId: 'friends',
-        petIds: ['pet_corgi_1', 'pet_cat_1'],
+        petIds: ['pet_corgi_1', cat.petId],
       );
       await _pumpChat(tester);
 

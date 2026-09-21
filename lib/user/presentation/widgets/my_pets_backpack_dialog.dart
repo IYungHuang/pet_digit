@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../common/services/image_optimization_service.dart';
+import '../../../common/services/invite_link_service.dart';
 import '../../../pet/domain/pet_profile.dart';
+import '../../domain/user_profile.dart';
 import '../user_pet_providers.dart';
 import 'pet_avatar_widget.dart';
 import 'pet_edit_dialog.dart';
@@ -136,6 +139,122 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
     }
   }
 
+  Future<void> _showSlotLimitDialog(UserProfile? profile) async {
+    final maxSlots = profile?.maxPetSlots ?? 1;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xfffff1f2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text('🎯', style: TextStyle(fontSize: 20)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '寵物欄位已達上限 ($maxSlots / $maxSlots)',
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              '每位主人預設最高可綁定 1 隻寵物。\n\n'
+              '想要攜帶更多毛孩同台冒險嗎？分享邀請好友加入，即可免費永久解鎖 +1 寵物欄位！\n\n'
+              '（未來亦將開放付費升級擴增欄位機制）',
+              style: TextStyle(
+                  fontSize: 13, height: 1.5, color: Color(0xff334155)),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xff4361ee),
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.share_rounded, size: 18),
+              label: const Text('🔗 分享邀請好友（解鎖 +1 欄位）',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              onPressed: () async {
+                Navigator.of(dialogCtx).pop();
+
+                try {
+                  final repo = ref.read(userPetRepositoryProvider);
+                  final updated =
+                      await repo.unlockBonusPetSlot(reason: 'invite');
+
+                  try {
+                    final link = InviteLinkService.buildWebInviteUrl(
+                      roomId: 'public_lobby',
+                      roomName: 'PetDigit 公共大廳',
+                    );
+                    await Clipboard.setData(ClipboardData(text: link));
+                  } catch (_) {}
+
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            '🎉 成功解鎖 +1 寵物欄位！目前上限：${updated.maxPetSlots} 隻！專屬邀請連結已複製到剪貼簿。'),
+                        backgroundColor: const Color(0xff2b8a3e),
+                      ),
+                    );
+                    setState(() => _showAddForm = true);
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('解鎖失敗: $e')),
+                    );
+                  }
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xff7048e8),
+                side: const BorderSide(color: Color(0xffd0bfff)),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.diamond_outlined, size: 18),
+              label: const Text('💎 預約付費擴增通知（即將推出）'),
+              onPressed: () {
+                Navigator.of(dialogCtx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('💎 付費擴增機制已在規劃中，感謝您的支持！')),
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(currentUserProfileProvider);
@@ -215,26 +334,119 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
                         const SizedBox(height: 16),
                       ],
 
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '擁有的寵物夥伴 (${petsAsync.value?.length ?? 0})',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
+                      Builder(builder: (context) {
+                        final profile = profileAsync.value;
+                        final maxSlots = profile?.maxPetSlots ?? 1;
+                        final pets = petsAsync.value ?? [];
+                        final currentCount = pets.length;
+                        final isFull = currentCount >= maxSlots;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      '擁有的寵物夥伴 ($currentCount / $maxSlots 隻)',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isFull
+                                            ? const Color(0xfffff1f2)
+                                            : const Color(0xffeff2fe),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: isFull
+                                              ? const Color(0xfffecdd3)
+                                              : const Color(0xffc7d2fe),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        isFull ? '欄位已滿' : '尚可登記',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: isFull
+                                              ? const Color(0xffe11d48)
+                                              : const Color(0xff4361ee),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (!_showAddForm)
+                                  TextButton.icon(
+                                    icon: const Icon(Icons.add_circle_outline,
+                                        size: 18),
+                                    label: const Text('登記新寵物'),
+                                    onPressed: () {
+                                      if (isFull) {
+                                        _showSlotLimitDialog(profile);
+                                      } else {
+                                        setState(() => _showAddForm = true);
+                                      }
+                                    },
+                                  ),
+                              ],
                             ),
-                          ),
-                          if (!_showAddForm)
-                            TextButton.icon(
-                              icon: const Icon(Icons.add_circle_outline,
-                                  size: 18),
-                              label: const Text('登記新寵物'),
-                              onPressed: () =>
-                                  setState(() => _showAddForm = true),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xfff8f9fa),
+                                borderRadius: BorderRadius.circular(10),
+                                border:
+                                    Border.all(color: const Color(0xffe9ecef)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Text('💡',
+                                      style: TextStyle(fontSize: 12)),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      '基礎 1 隻 · 邀請獎勵 +${profile?.invitedBonusSlots ?? 0} · 付費擴增 +${profile?.paidBonusSlots ?? 0}',
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xff495057)),
+                                    ),
+                                  ),
+                                  if (isFull)
+                                    InkWell(
+                                      onTap: () =>
+                                          _showSlotLimitDialog(profile),
+                                      child: const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 4, vertical: 2),
+                                        child: Text(
+                                          '解鎖欄位 🔗',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xff4361ee),
+                                            decoration:
+                                                TextDecoration.underline,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
-                        ],
-                      ),
+                          ],
+                        );
+                      }),
                       const SizedBox(height: 12),
 
                       petsAsync.when(

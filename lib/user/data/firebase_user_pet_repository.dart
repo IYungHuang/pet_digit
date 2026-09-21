@@ -87,6 +87,15 @@ class FirebaseUserPetRepository implements UserPetRepository {
   }
 
   @override
+  Future<UserProfile> unlockBonusPetSlot({required String reason}) async {
+    final result = await _functions
+        .httpsCallable('unlockBonusPetSlot')
+        .call({'reason': reason});
+    final map = _toMap(result.data);
+    return UserProfile.fromJson(map);
+  }
+
+  @override
   Future<List<PetProfile>> getUserPets(String uid) async {
     final snapshot =
         await _firestore.collection('users').doc(uid).collection('pets').get();

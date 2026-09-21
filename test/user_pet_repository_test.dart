@@ -148,11 +148,13 @@ void main() {
       expect(profile, isNotNull);
       expect(profile!.nickname, '小柴主人');
       expect(profile.defaultPetId, 'pet_corgi_1');
+      expect(profile.basePetSlots, 1);
+      expect(profile.invitedBonusSlots, 0);
+      expect(profile.maxPetSlots, 1);
 
       final pets = await repo.getUserPets('me');
-      expect(pets.length, 2);
+      expect(pets.length, 1);
       expect(pets[0].name, '阿福');
-      expect(pets[1].name, '咪咪');
     });
 
     test('upsertUserProfile updates profile and enforces unique searchTag',
@@ -223,9 +225,66 @@ void main() {
       expect(updatedPet.name, '超級阿福');
       expect(updatedPet.personality, 'very_playful');
 
-      await repo.setDefaultPet('pet_cat_1');
+      // Unlock bonus slot to register a 2nd pet then set as default
+      await repo.unlockBonusPetSlot(reason: 'invite');
+      final cat = await repo.registerPet(
+        name: '咪咪',
+        species: PetSpecies.cat,
+        breed: 'british_shorthair',
+        avatarUrl: 'assets/pets/cat_real.png',
+      );
+
+      await repo.setDefaultPet(cat.petId);
       final user = await repo.getUserProfile('me');
-      expect(user!.defaultPetId, 'pet_cat_1');
+      expect(user!.defaultPetId, cat.petId);
+    });
+
+    test('enforces pet slot limits and unlocks bonus slots', () async {
+      final profile = await repo.getUserProfile('me');
+      expect(profile!.basePetSlots, 1);
+      expect(profile.invitedBonusSlots, 0);
+      expect(profile.maxPetSlots, 1);
+
+      // Attempting to register without extra slot should throw
+      expect(
+        () => repo.registerPet(
+          name: '第二隻寵物',
+          species: PetSpecies.cat,
+          breed: 'cat',
+          avatarUrl: '',
+        ),
+        throwsA(isA<StateError>()),
+      );
+
+      // Unlock invite bonus slot
+      final afterInvite = await repo.unlockBonusPetSlot(reason: 'invite');
+      expect(afterInvite.invitedBonusSlots, 1);
+      expect(afterInvite.maxPetSlots, 2);
+
+      // Register now succeeds
+      final pet2 = await repo.registerPet(
+        name: '第二隻寵物',
+        species: PetSpecies.cat,
+        breed: 'cat',
+        avatarUrl: '',
+      );
+      expect(pet2.name, '第二隻寵物');
+
+      // 2/2 full, registering 3rd fails
+      expect(
+        () => repo.registerPet(
+          name: '第三隻寵物',
+          species: PetSpecies.parrot,
+          breed: 'parrot',
+          avatarUrl: '',
+        ),
+        throwsA(isA<StateError>()),
+      );
+
+      // Unlock paid bonus slot
+      final afterPaid = await repo.unlockBonusPetSlot(reason: 'paid');
+      expect(afterPaid.paidBonusSlots, 1);
+      expect(afterPaid.maxPetSlots, 3);
     });
 
     test('createRoom direct message and group message', () async {
@@ -249,9 +308,17 @@ void main() {
 
     test('updateRoomPets updates active pets in room', () async {
       const roomId = 'friends';
+      await repo.unlockBonusPetSlot(reason: 'invite');
+      final cat = await repo.registerPet(
+        name: '咪咪',
+        species: PetSpecies.cat,
+        breed: 'british_shorthair',
+        avatarUrl: 'assets/pets/cat_real.png',
+      );
+
       final updated = await repo.updateRoomPets(
         roomId: roomId,
-        petIds: ['pet_corgi_1', 'pet_cat_1'],
+        petIds: ['pet_corgi_1', cat.petId],
       );
 
       expect(updated.length, 2);

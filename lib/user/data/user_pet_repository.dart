@@ -67,6 +67,7 @@ abstract class UserPetRepository {
   });
   Future<void> addFriend(String targetUid);
   Future<bool> isFriend(String targetUid);
+  Future<UserProfile> unlockBonusPetSlot({required String reason});
 
   // Pets
   Future<List<PetProfile>> getUserPets(String uid);

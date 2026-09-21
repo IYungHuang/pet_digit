@@ -47,3 +47,9 @@ Current direction:
   authenticated Dio/WebSocket providers are supplied.
 - Video playback uses `video_player`; connection state supports reconnect and
   offline UI. Delay Drift, offline persistence, and resumable uploads.
+
+## Testing & Model Tier Guidelines (測試與模型分級原則)
+
+- **機械化測試與回歸驗證（Mechanical Tests & Regressions）**：
+  - 例行性的測試執行（`flutter test`、`flutter analyze`）、單元測試除錯、靜態代碼檢查、語法修復、機械化重構或日誌比對等任務，建議指派或使用較輕量/低階的模型（如 `flash` / `flash_lite`）運作即可，兼顧快速反饋與節省資源。
+  - 核心架構設計、跨端協議制定、複雜多模態或深層邏輯推導任務，才指派或使用高階模型（如 `pro` / 主模型）。

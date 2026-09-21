@@ -49,6 +49,9 @@ class FakeUserPetRepository implements UserPetRepository {
       searchTag: 'corgi_lover',
       searchTagLower: 'corgi_lover',
       defaultPetId: defaultPetId,
+      basePetSlots: 1,
+      invitedBonusSlots: 0,
+      paidBonusSlots: 0,
       createdAt: now,
       updatedAt: now,
     );
@@ -63,18 +66,6 @@ class FakeUserPetRepository implements UserPetRepository {
         avatarUrl: 'assets/pets/corgi_real.png',
         gender: PetGender.male,
         personality: 'playful',
-        createdAt: now,
-        updatedAt: now,
-      ),
-      PetProfile(
-        petId: 'pet_cat_1',
-        ownerUid: 'me',
-        name: '咪咪',
-        species: PetSpecies.cat,
-        breed: 'british_shorthair',
-        avatarUrl: 'assets/pets/cat_real.png',
-        gender: PetGender.female,
-        personality: 'curious',
         createdAt: now,
         updatedAt: now,
       ),
@@ -315,6 +306,28 @@ class FakeUserPetRepository implements UserPetRepository {
   }
 
   @override
+  Future<UserProfile> unlockBonusPetSlot({required String reason}) async {
+    final user = _users[currentUid];
+    if (user == null) {
+      throw StateError('User not found: $currentUid');
+    }
+
+    final updated = user.copyWith(
+      invitedBonusSlots: reason == 'invite'
+          ? user.invitedBonusSlots + 1
+          : user.invitedBonusSlots,
+      paidBonusSlots: reason == 'paid'
+          ? user.paidBonusSlots + 1
+          : user.paidBonusSlots,
+      updatedAt: DateTime.now().toUtc(),
+    );
+
+    _users[currentUid] = updated;
+    _notifyUser(currentUid);
+    return updated;
+  }
+
+  @override
   Future<List<PetProfile>> getUserPets(String uid) async {
     return List.unmodifiable(_pets[uid] ?? []);
   }
@@ -340,6 +353,15 @@ class FakeUserPetRepository implements UserPetRepository {
     String? personality,
     bool? setAsDefault,
   }) async {
+    final user = _users[currentUid];
+    final currentList = _pets[currentUid] ?? [];
+    final maxSlots = user?.maxPetSlots ?? 1;
+
+    if (currentList.length >= maxSlots) {
+      throw StateError(
+        '寵物綁定已達上限 ($maxSlots 隻)。邀請好友可免費解鎖 +1 寵物欄位！',
+      );
+    }
     final petId = 'pet_${species.name}_${DateTime.now().millisecondsSinceEpoch}';
     final now = DateTime.now().toUtc();
     final newPet = PetProfile(
@@ -358,11 +380,9 @@ class FakeUserPetRepository implements UserPetRepository {
       updatedAt: now,
     );
 
-    final currentList = _pets[currentUid] ?? [];
     currentList.add(newPet);
     _pets[currentUid] = currentList;
 
-    final user = _users[currentUid];
     if (user != null &&
         (user.defaultPetId.isEmpty || setAsDefault == true)) {
       _users[currentUid] = user.copyWith(defaultPetId: petId);
