@@ -161,5 +161,88 @@ void main() {
 
       expect(selectedSource, ImageSource.camera);
     });
+
+    testWidgets(
+      'showImageSourcePickerAndPick bypasses bottom sheet when isMobile is false (desktop/web)',
+      (tester) async {
+        final fakePicker = _FakeImagePicker(
+          xFileToReturn: XFile('/data/desktop_photo.jpg', mimeType: 'image/jpeg'),
+        );
+        final service = ImageOptimizationService(picker: fakePicker);
+        XFile? result;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () async {
+                  result = await service.showImageSourcePickerAndPick(
+                    context,
+                    isMobileOverride: false,
+                  );
+                },
+                child: const Text('Pick Image'),
+              ),
+            ),
+          ),
+        );
+
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Pick Image'));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pumpAndSettle();
+
+        // Should NOT show the bottom sheet
+        expect(find.text('拍照 (立即拍攝)'), findsNothing);
+        expect(result, isNotNull);
+        expect(result!.path, '/data/desktop_photo.jpg');
+      },
+    );
+
+    testWidgets(
+      'showImageSourcePickerAndPick shows bottom sheet when isMobile is true (iOS/Android)',
+      (tester) async {
+        final fakePicker = _FakeImagePicker(
+          xFileToReturn: XFile('/data/mobile_photo.jpg', mimeType: 'image/jpeg'),
+        );
+        final service = ImageOptimizationService(picker: fakePicker);
+        XFile? result;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () async {
+                  result = await service.showImageSourcePickerAndPick(
+                    context,
+                    isMobileOverride: true,
+                  );
+                },
+                child: const Text('Pick Image'),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Pick Image'));
+        await tester.pumpAndSettle();
+
+        // Bottom sheet should be visible
+        expect(find.text('拍照 (立即拍攝)'), findsOneWidget);
+        expect(find.text('從相簿選取'), findsOneWidget);
+
+        // Tap camera
+        await tester.tap(find.text('拍照 (立即拍攝)'));
+        await tester.pump();
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pumpAndSettle();
+
+        expect(result, isNotNull);
+        expect(result!.path, '/data/mobile_photo.jpg');
+      },
+    );
   });
 }

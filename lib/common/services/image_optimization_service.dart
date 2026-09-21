@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -117,14 +119,22 @@ class ImageOptimizationService {
     return file;
   }
 
-  /// Displays an adaptive bottom sheet prompting the user to choose between
-  /// Camera (拍照) and Gallery (從相簿選取), then executes the image picking
-  /// and optimization process.
+  /// On mobile devices (iOS/Android), displays an adaptive bottom sheet
+  /// prompting the user to choose between Camera (拍照) and Gallery (從相簿選取).
+  /// On desktop (macOS/Windows/Linux) and web, directly opens the gallery/file picker
+  /// without popping up the mobile camera option.
   Future<XFile?> showImageSourcePickerAndPick(
     BuildContext context, {
     ImageOptimizationPreset preset = ImageOptimizationPreset.galleryPhoto,
     String title = '上傳寵物生活照',
+    bool? isMobileOverride,
   }) async {
+    final isMobile = isMobileOverride ?? (!kIsWeb && (Platform.isIOS || Platform.isAndroid));
+    if (!isMobile) {
+      // Desktop / Web: directly pick from gallery/file selector
+      return pickOptimizedImage(source: ImageSource.gallery, preset: preset);
+    }
+
     final source = await showImageSourceActionSheet(context, title: title);
     if (source == null) return null;
     return pickOptimizedImage(source: source, preset: preset);
