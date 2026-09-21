@@ -306,5 +306,44 @@ void main() {
       final pets = await fakeRepo.getUserPets('me');
       expect(pets.any((p) => p.name == '皮卡'), isTrue);
     });
+
+    testWidgets(
+        'preset pet photo chips display correct breeds and update breed input',
+        (tester) async {
+      await tester.pumpWidget(
+        buildTestApp(const AuthScreen()),
+      );
+
+      // Tap Google account button
+      await tester.tap(find.text('Google 帳號'));
+      await tester.pumpAndSettle();
+
+      // Dog presets by default:
+      expect(find.text('柯基寫真'), findsOneWidget);
+      expect(find.text('柴犬寫真'), findsOneWidget);
+
+      // Tap 柯基寫真
+      await tester.tap(find.text('柯基寫真'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(TextField, '柯基犬'), findsOneWidget);
+
+      // Switch to cat
+      await tester.tap(find.text('🐱 貓咪'));
+      await tester.pumpAndSettle();
+
+      // Cat presets:
+      expect(find.text('布偶寫真'), findsOneWidget);
+      expect(find.text('英短寫真'), findsOneWidget);
+
+      // Tap 布偶寫真
+      await tester.tap(find.text('布偶寫真'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(TextField, '布偶貓'), findsOneWidget);
+
+      // Tap 英短寫真
+      await tester.tap(find.text('英短寫真'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(TextField, '英國短毛貓'), findsOneWidget);
+    });
   });
 }

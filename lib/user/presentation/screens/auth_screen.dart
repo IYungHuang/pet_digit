@@ -669,18 +669,18 @@ class _ThirdPartyConnectedPetDialogState
   final Map<PetSpecies, List<String>> _presetAvatars = const {
     PetSpecies.dog: [
       'assets/pets/corgi_idle_0.png',
-      'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=300&q=80',
-      'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=300&q=80',
+      'https://images.unsplash.com/photo-1589965716319-4a041b58fa8a?w=400&q=80',
+      'https://images.unsplash.com/photo-1575535468632-345892291673?w=400&q=80',
     ],
     PetSpecies.cat: [
       'assets/pets/cat_idle_0.png',
-      'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=300&q=80',
-      'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=300&q=80',
+      'https://images.unsplash.com/photo-1585373683920-671438c82bfa?w=400&q=80',
+      'https://images.unsplash.com/photo-1629624467541-f73ef8f12df2?w=400&q=80',
     ],
     PetSpecies.parrot: [
       'assets/pets/parrot_idle_0.png',
-      'https://images.unsplash.com/photo-1552728089-57bdde30beb3?w=300&q=80',
-      'https://images.unsplash.com/photo-1544943910-4c1dc44a0ff4?w=300&q=80',
+      'https://images.unsplash.com/photo-1552728089-57bdde30beb3?w=400&q=80',
+      'https://images.unsplash.com/photo-1544943910-4c1dc44a0ff4?w=400&q=80',
     ],
   };
 
@@ -724,10 +724,10 @@ class _ThirdPartyConnectedPetDialogState
 
   String _presetLabel(String url) {
     if (url.startsWith('assets/')) return '像素款';
-    if (url.contains('54346')) return '柯基寫真';
-    if (url.contains('58351')) return '柴犬寫真';
-    if (url.contains('51488')) return '萌貓寫真';
-    if (url.contains('57386')) return '英短寫真';
+    if (url.contains('58996')) return '柯基寫真';
+    if (url.contains('57553')) return '柴犬寫真';
+    if (url.contains('58537')) return '布偶寫真';
+    if (url.contains('62962')) return '英短寫真';
     if (url.contains('55272')) return '鸚鵡寫真';
     if (url.contains('54494')) return '玄鳳寫真';
     return '範本寫真';
@@ -891,8 +891,18 @@ class _ThirdPartyConnectedPetDialogState
                                       label: Text(_presetLabel(preset),
                                           style: const TextStyle(fontSize: 10)),
                                       selected: isSel,
-                                      onSelected: (_) => setState(
-                                          () => _avatarUrl = preset),
+                                      onSelected: (_) => setState(() {
+                                        _avatarUrl = preset;
+                                        if (preset.contains('58996')) {
+                                          _breedController.text = '柯基犬';
+                                        } else if (preset.contains('57553')) {
+                                          _breedController.text = '柴犬';
+                                        } else if (preset.contains('58537')) {
+                                          _breedController.text = '布偶貓';
+                                        } else if (preset.contains('62962')) {
+                                          _breedController.text = '英國短毛貓';
+                                        }
+                                      }),
                                       visualDensity: VisualDensity.compact,
                                     ),
                                   );
