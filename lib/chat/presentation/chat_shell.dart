@@ -23,6 +23,7 @@ import 'chat_providers.dart';
 import 'chat_timeline_policy.dart';
 import 'widgets/media_preview_dialog.dart';
 import '../../user/presentation/user_pet_providers.dart';
+import '../../user/presentation/widgets/contacts_dialog.dart';
 import '../../user/presentation/widgets/create_room_dialog.dart';
 import '../../user/presentation/widgets/my_pets_backpack_dialog.dart';
 import '../../user/presentation/widgets/onboarding_wizard_dialog.dart';
@@ -483,6 +484,10 @@ class _ChatShellState extends ConsumerState<ChatShell> {
           activePets.addAll(m.pets);
         }
       }
+      // Stage capacity constraint: at most 10 pets simultaneously on stage
+      if (activePets.length > 10) {
+        activePets.removeRange(10, activePets.length);
+      }
     });
 
     final activeControllers = <PetWorldController>[_world];
@@ -613,6 +618,14 @@ class _ChatShellState extends ConsumerState<ChatShell> {
             tooltip: '我的寵物背包',
             icon: const Icon(Icons.backpack_outlined, color: Color(0xff4361ee)),
             onPressed: () => MyPetsBackpackDialog.show(context),
+          ),
+          IconButton(
+            tooltip: '通訊錄與好友',
+            icon: const Icon(Icons.contacts_rounded, color: Color(0xff4361ee)),
+            onPressed: () => ContactsDialog.show(
+              context,
+              onOpenRoom: _selectRoom,
+            ),
           ),
           IconButton(
             tooltip: '房間寵物出動調度',

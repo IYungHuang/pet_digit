@@ -72,5 +72,18 @@
 	<string>需要存取您的相片庫以選取寵物的美照並設置為代表頭像</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>需要使用您的麥克風來錄製寵物多媒體影音</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.iyunghuang.petdigitchat</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>petdigit</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

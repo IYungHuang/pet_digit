@@ -88,6 +88,11 @@ class _CreateRoomDialogState extends ConsumerState<CreateRoomDialog> {
       return;
     }
 
+    if (_roomType == RoomType.group && _selectedUids.length > 9) {
+      setState(() => _errorMessage = '群組上限為 10 人（最多邀請 9 位好友）！');
+      return;
+    }
+
     setState(() {
       _creating = true;
       _errorMessage = null;
@@ -324,6 +329,10 @@ class _CreateRoomDialogState extends ConsumerState<CreateRoomDialog> {
                                         onChanged: (val) {
                                           setState(() {
                                             if (val == true) {
+                                              if (_selectedUids.length >= 9) {
+                                                _errorMessage = '群組上限為 10 人（含您最多邀請 9 位好友）';
+                                                return;
+                                              }
                                               _selectedUids.add(user.uid);
                                             } else {
                                               _selectedUids.remove(user.uid);
@@ -337,6 +346,10 @@ class _CreateRoomDialogState extends ConsumerState<CreateRoomDialog> {
                                           if (isSelected) {
                                             _selectedUids.remove(user.uid);
                                           } else {
+                                            if (_selectedUids.length >= 9) {
+                                              _errorMessage = '群組上限為 10 人（含您最多邀請 9 位好友）';
+                                              return;
+                                            }
                                             _selectedUids.add(user.uid);
                                           }
                                         });
@@ -358,7 +371,7 @@ class _CreateRoomDialogState extends ConsumerState<CreateRoomDialog> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('已選取 ${_selectedUids.length} 位成員'),
+                      Text('已選取 ${_selectedUids.length} / 9 位好友 (上限10人)'),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xff4361ee),

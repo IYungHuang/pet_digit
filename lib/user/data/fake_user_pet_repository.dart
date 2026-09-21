@@ -391,6 +391,9 @@ class FakeUserPetRepository implements UserPetRepository {
     }
 
     final allMemberUids = {currentUid, ...inviteeUids}.toList();
+    if (type == RoomType.group && allMemberUids.length > 10) {
+      throw ArgumentError('群組成員上限為 10 人 (MVP)');
+    }
     final membersList = <RoomMember>[];
 
     for (final memberUid in allMemberUids) {
