@@ -31,8 +31,18 @@ enum PetActionType {
 }
 
 class PetWorldController implements PetBehaviorRuntime {
+  PetWorldController({
+    this.id = 'default',
+    this.name = '',
+    this.spawnOffset = const Offset(24, 24),
+  }) : position = spawnOffset;
+
+  String id;
+  String name;
+  Offset spawnOffset;
+
   PetState state = PetState.idle;
-  Offset position = const Offset(24, 24);
+  Offset position;
   List<PetMessageTarget> _objects = const [];
   List<PetMessageTarget> get objects => _objects;
   set objects(List<PetMessageTarget> targets) => setMessageTargets(targets);
@@ -192,7 +202,7 @@ class PetWorldController implements PetBehaviorRuntime {
     _seenMessageSources.clear();
     _pendingStimulus = null;
     state = PetState.idle;
-    position = const Offset(24, 24);
+    position = spawnOffset;
     _time = 0;
     _walkDirection = 1;
     currentAction = PetActionType.none;

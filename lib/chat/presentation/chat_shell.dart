@@ -27,6 +27,8 @@ import '../../user/presentation/widgets/create_room_dialog.dart';
 import '../../user/presentation/widgets/my_pets_backpack_dialog.dart';
 import '../../user/presentation/widgets/onboarding_wizard_dialog.dart';
 import '../../user/presentation/widgets/room_pet_summon_dialog.dart';
+import '../../pet/domain/pet_profile.dart';
+import '../../pet/domain/pet_room_snapshot.dart';
 
 class ChatShell extends ConsumerStatefulWidget {
   const ChatShell({
@@ -45,6 +47,10 @@ class ChatShell extends ConsumerStatefulWidget {
 class _ChatShellState extends ConsumerState<ChatShell> {
   final _rooms = FakeChatRepository.rooms;
   final _world = PetWorldController();
+  final _roomPetControllers = <String, PetWorldController>{};
+  Map<String, Rect> _lastBoundsMap = const {};
+  Size _lastViewportSize = Size.zero;
+  String? _lastPrimaryPetId;
   final _stackKey = GlobalKey();
   final _scrollController = ScrollController();
   final _composerController = TextEditingController();
@@ -118,7 +124,11 @@ class _ChatShellState extends ConsumerState<ChatShell> {
   void _syncBubbleBounds() {
     final stackBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
     if (stackBox == null || !stackBox.hasSize) return;
+    _lastViewportSize = stackBox.size;
     _world.updateViewportSize(stackBox.size);
+    for (final c in _roomPetControllers.values) {
+      c.updateViewportSize(stackBox.size);
+    }
 
     final boundsMap = <String, Rect>{};
     for (final entry in _cardKeys.entries) {
@@ -129,7 +139,13 @@ class _ChatShellState extends ConsumerState<ChatShell> {
         boundsMap[entry.key] = topLeft & cardBox.size;
       }
     }
-    if (boundsMap.isNotEmpty) _world.updateObjectBounds(boundsMap);
+    _lastBoundsMap = boundsMap;
+    if (boundsMap.isNotEmpty) {
+      _world.updateObjectBounds(boundsMap);
+      for (final c in _roomPetControllers.values) {
+        c.updateObjectBounds(boundsMap);
+      }
+    }
   }
 
   void _scheduleBubbleBoundsSync() {
@@ -150,6 +166,8 @@ class _ChatShellState extends ConsumerState<ChatShell> {
     setState(() {
       _activeRoomId = id;
       _cardKeys.clear();
+      _roomPetControllers.clear();
+      _lastPrimaryPetId = null;
       _lastMessageCount = 0;
       _hasNewMessages = false;
       _isNearBottom = true;
@@ -385,6 +403,9 @@ class _ChatShellState extends ConsumerState<ChatShell> {
     final messages = messageState.asData?.value;
     if (messages != null) {
       _world.setMessageBubbleTargets(messages, roomId: _activeRoomId);
+      for (final c in _roomPetControllers.values) {
+        c.setMessageBubbleTargets(messages, roomId: _activeRoomId);
+      }
     }
     final messageCount = messageState.asData?.value.length;
     if (messageCount != null) {
@@ -440,6 +461,62 @@ class _ChatShellState extends ConsumerState<ChatShell> {
       },
       orElse: () => _rooms,
     );
+
+    final roomMembersAsync = ref.watch(roomMembersProvider(_activeRoomId));
+    final activePets = <PetRoomSnapshot>[];
+    roomMembersAsync.whenData((members) {
+      for (final m in members) {
+        if (m.active) {
+          activePets.addAll(m.pets);
+        }
+      }
+    });
+
+    final activeControllers = <PetWorldController>[_world];
+    if (activePets.isNotEmpty) {
+      final primary = activePets.first;
+      if (_lastPrimaryPetId != primary.petId) {
+        _lastPrimaryPetId = primary.petId;
+        _world.id = primary.petId;
+        _world.name = primary.name;
+        _world.selectedPet = primary.species.toPetType();
+      } else {
+        _world.name = primary.name;
+      }
+
+      final remainingPets = activePets.skip(1).toList();
+      final remainingIds = remainingPets.map((p) => p.petId).toSet();
+      _roomPetControllers.removeWhere((id, _) => !remainingIds.contains(id));
+
+      for (var i = 0; i < remainingPets.length; i++) {
+        final pet = remainingPets[i];
+        final existing = _roomPetControllers[pet.petId];
+        if (existing == null) {
+          final spawnX = 24.0 + ((i + 1) * 72.0);
+          final c = PetWorldController(
+            id: pet.petId,
+            name: pet.name,
+            spawnOffset: Offset(spawnX.clamp(24.0, 260.0), 24.0),
+          )..selectedPet = pet.species.toPetType();
+          c.loadRoom(_room);
+          c.updateViewportSize(_lastViewportSize);
+          if (_lastBoundsMap.isNotEmpty) {
+            c.updateObjectBounds(_lastBoundsMap);
+          }
+          if (messages != null) {
+            c.setMessageBubbleTargets(messages, roomId: _activeRoomId);
+          }
+          _roomPetControllers[pet.petId] = c;
+          activeControllers.add(c);
+        } else {
+          existing.name = pet.name;
+          existing.selectedPet = pet.species.toPetType();
+          activeControllers.add(existing);
+        }
+      }
+    } else {
+      _roomPetControllers.clear();
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -581,7 +658,11 @@ class _ChatShellState extends ConsumerState<ChatShell> {
                       ),
                     ),
                   ),
-                PetWorldOverlay(room: _room, controller: _world),
+                PetWorldOverlay(
+                  room: _room,
+                  controller: _world,
+                  controllers: activeControllers,
+                ),
               ],
             ),
           ),

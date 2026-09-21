@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../common/domain/datetime_json_converter.dart';
+import 'pet_world.dart';
 
 part 'pet_profile.freezed.dart';
 part 'pet_profile.g.dart';
@@ -12,6 +13,16 @@ enum PetSpecies {
   cat,
   @JsonValue('parrot')
   parrot,
+}
+
+extension PetSpeciesX on PetSpecies {
+  PetType toPetType() {
+    return switch (this) {
+      PetSpecies.dog => PetType.corgi,
+      PetSpecies.cat => PetType.cat,
+      PetSpecies.parrot => PetType.parrot,
+    };
+  }
 }
 
 enum PetGender {
