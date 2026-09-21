@@ -16,6 +16,8 @@ class PetAvatarWidget extends StatelessWidget {
     this.showBorder = false,
     this.borderColor,
     this.borderWidth = 1.5,
+    this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
   });
 
   final String avatarUrl;
@@ -25,11 +27,14 @@ class PetAvatarWidget extends StatelessWidget {
   final bool showBorder;
   final Color? borderColor;
   final double borderWidth;
+  final BoxFit fit;
+  final Alignment alignment;
 
   @override
   Widget build(BuildContext context) {
     Widget imageContent;
-    final cacheDim = ImageOptimizationService.calculateCacheDimension(context, size);
+    final cacheDim =
+        ImageOptimizationService.calculateCacheDimension(context, size);
 
     final trimmed = avatarUrl.trim();
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
@@ -37,9 +42,11 @@ class PetAvatarWidget extends StatelessWidget {
         trimmed,
         width: size,
         height: size,
+        // Only set cacheWidth: Flutter preserves aspect ratio when only one dimension is specified.
+        // Specifying both causes the image codec to forcibly stretch and distort the bitmap!
         cacheWidth: cacheDim,
-        cacheHeight: cacheDim,
-        fit: BoxFit.cover,
+        fit: fit,
+        alignment: alignment,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
           return Center(
@@ -61,9 +68,9 @@ class PetAvatarWidget extends StatelessWidget {
         assetPath,
         width: size,
         height: size,
-        cacheWidth: cacheDim,
-        cacheHeight: cacheDim,
-        fit: BoxFit.cover,
+        fit: fit,
+        alignment: alignment,
+        filterQuality: FilterQuality.none, // Keep pixel art sharp
         errorBuilder: (_, __, ___) => _buildFallback(),
       );
     } else if (trimmed.isNotEmpty && !kIsWeb && File(trimmed).existsSync()) {
@@ -72,8 +79,8 @@ class PetAvatarWidget extends StatelessWidget {
         width: size,
         height: size,
         cacheWidth: cacheDim,
-        cacheHeight: cacheDim,
-        fit: BoxFit.cover,
+        fit: fit,
+        alignment: alignment,
         errorBuilder: (_, __, ___) => _buildFallback(),
       );
     } else {

@@ -669,18 +669,18 @@ class _ThirdPartyConnectedPetDialogState
   final Map<PetSpecies, List<String>> _presetAvatars = const {
     PetSpecies.dog: [
       'assets/pets/corgi_idle_0.png',
-      'https://images.unsplash.com/photo-1589965716319-4a041b58fa8a?w=400&q=80',
-      'https://images.unsplash.com/photo-1575535468632-345892291673?w=400&q=80',
+      'https://images.unsplash.com/photo-1589965716319-4a041b58fa8a?fit=crop&crop=faces&w=400&h=400&q=80',
+      'https://images.unsplash.com/photo-1575535468632-345892291673?fit=crop&crop=top&w=400&h=400&q=80',
     ],
     PetSpecies.cat: [
       'assets/pets/cat_idle_0.png',
-      'https://images.unsplash.com/photo-1585373683920-671438c82bfa?w=400&q=80',
-      'https://images.unsplash.com/photo-1629624467541-f73ef8f12df2?w=400&q=80',
+      'https://images.unsplash.com/photo-1585373683920-671438c82bfa?fit=crop&crop=top&w=400&h=400&q=80',
+      'https://images.unsplash.com/photo-1629624467541-f73ef8f12df2?fit=crop&crop=top&w=400&h=400&q=80',
     ],
     PetSpecies.parrot: [
       'assets/pets/parrot_idle_0.png',
-      'https://images.unsplash.com/photo-1552728089-57bdde30beb3?w=400&q=80',
-      'https://images.unsplash.com/photo-1544943910-4c1dc44a0ff4?w=400&q=80',
+      'https://images.unsplash.com/photo-1552728089-57bdde30beb3?fit=crop&crop=faces&w=400&h=400&q=80',
+      'https://images.unsplash.com/photo-1517101724602-c257fe568157?fit=crop&crop=faces&w=400&h=400&q=80',
     ],
   };
 
@@ -729,7 +729,7 @@ class _ThirdPartyConnectedPetDialogState
     if (url.contains('58537')) return '布偶寫真';
     if (url.contains('62962')) return '英短寫真';
     if (url.contains('55272')) return '鸚鵡寫真';
-    if (url.contains('54494')) return '玄鳳寫真';
+    if (url.contains('51710') || url.contains('54494')) return '玄鳳寫真';
     return '範本寫真';
   }
 
