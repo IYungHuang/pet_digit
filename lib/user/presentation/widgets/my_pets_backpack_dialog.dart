@@ -144,6 +144,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
     final defaultPetId = profileAsync.value?.defaultPetId ?? '';
 
     return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
@@ -310,7 +311,10 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       pet.name,
@@ -320,7 +324,6 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
                         color: Color(0xff1f2030),
                       ),
                     ),
-                    const SizedBox(width: 8),
                     if (isDefault)
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -329,18 +332,13 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
                           color: const Color(0xfffff3bf),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '⭐ 預設主寵',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xffd97706),
-                              ),
-                            ),
-                          ],
+                        child: const Text(
+                          '⭐ 預設主寵',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xffd97706),
+                          ),
                         ),
                       ),
                   ],

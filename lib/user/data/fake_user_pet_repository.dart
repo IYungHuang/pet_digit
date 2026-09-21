@@ -29,6 +29,7 @@ class FakeUserPetRepository implements UserPetRepository {
   final Map<String, List<PetProfile>> _pets;
   final Map<String, List<RoomSummary>> _roomSummaries;
   final Map<String, List<RoomMember>> _roomMembers;
+  final Set<String> _friendUids = {'user_friend_1'};
 
   final Map<String, StreamController<UserProfile?>> _userControllers = {};
   final Map<String, StreamController<List<PetProfile>>> _petsControllers = {};
@@ -105,10 +106,66 @@ class FakeUserPetRepository implements UserPetRepository {
       ),
     ];
 
+    final seed2Profile = UserProfile(
+      uid: 'user_seed_2',
+      nickname: '阿福爸爸',
+      avatarUrl: 'assets/avatars/user_seed_2.png',
+      searchTag: 'corgi_papa',
+      searchTagLower: 'corgi_papa',
+      defaultPetId: 'pet_corgi_2',
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    final seed2Pets = [
+      PetProfile(
+        petId: 'pet_corgi_2',
+        ownerUid: 'user_seed_2',
+        name: '阿福',
+        species: PetSpecies.dog,
+        breed: 'corgi',
+        avatarUrl: 'assets/pets/corgi_real.png',
+        gender: PetGender.male,
+        personality: 'energetic',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ];
+
+    final seed3Profile = UserProfile(
+      uid: 'user_seed_3',
+      nickname: '美玲咪咪',
+      avatarUrl: 'assets/avatars/user_seed_3.png',
+      searchTag: 'ragdoll_meiling',
+      searchTagLower: 'ragdoll_meiling',
+      defaultPetId: 'pet_cat_ragdoll_1',
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    final seed3Pets = [
+      PetProfile(
+        petId: 'pet_cat_ragdoll_1',
+        ownerUid: 'user_seed_3',
+        name: '咪咪',
+        species: PetSpecies.cat,
+        breed: 'ragdoll',
+        avatarUrl: 'assets/pets/cat_real.png',
+        gender: PetGender.female,
+        personality: 'gentle',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ];
+
     _users['me'] = meProfile;
     _users['user_friend_1'] = friendProfile;
+    _users['user_seed_2'] = seed2Profile;
+    _users['user_seed_3'] = seed3Profile;
     _pets['me'] = mePets;
     _pets['user_friend_1'] = friendPets;
+    _pets['user_seed_2'] = seed2Pets;
+    _pets['user_seed_3'] = seed3Pets;
 
     const defaultRoomId = 'friends';
     _roomSummaries['me'] = [
@@ -229,7 +286,10 @@ class FakeUserPetRepository implements UserPetRepository {
     final results = <UserSearchResult>[];
     for (final user in _users.values) {
       if (user.uid == currentUid) continue;
-      if (user.searchTagLower.contains(clean) ||
+      // If query is empty, only return established friends
+      if (clean.isEmpty && !_friendUids.contains(user.uid)) continue;
+      if (clean.isEmpty ||
+          user.searchTagLower.contains(clean) ||
           user.nickname.toLowerCase().contains(clean)) {
         results.add(UserSearchResult(
           uid: user.uid,
@@ -242,6 +302,16 @@ class FakeUserPetRepository implements UserPetRepository {
       if (limit != null && results.length >= limit) break;
     }
     return results;
+  }
+
+  @override
+  Future<void> addFriend(String targetUid) async {
+    _friendUids.add(targetUid);
+  }
+
+  @override
+  Future<bool> isFriend(String targetUid) async {
+    return _friendUids.contains(targetUid);
   }
 
   @override

@@ -65,6 +65,8 @@ abstract class UserPetRepository {
     required String query,
     int? limit,
   });
+  Future<void> addFriend(String targetUid);
+  Future<bool> isFriend(String targetUid);
 
   // Pets
   Future<List<PetProfile>> getUserPets(String uid);

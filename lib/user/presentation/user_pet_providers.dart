@@ -6,8 +6,13 @@ import '../../chat/presentation/chat_providers.dart';
 import '../../pet/domain/pet_profile.dart';
 import '../data/fake_user_pet_repository.dart';
 import '../data/firebase_user_pet_repository.dart';
+import '../data/phone_contacts_service.dart';
 import '../data/user_pet_repository.dart';
 import '../domain/user_profile.dart';
+
+final phoneContactsServiceProvider = Provider<PhoneContactsService>((ref) {
+  return PhoneContactsService();
+});
 
 final fakeUserPetRepositoryProvider = Provider<FakeUserPetRepository>((ref) {
   final repo = FakeUserPetRepository();

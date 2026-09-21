@@ -21,15 +21,17 @@ class InviteLinkService {
 
   /// Generates a standardized shareable web invite URL.
   static String buildWebInviteUrl({
-    required String roomId,
+    String? roomId,
+    String? code,
     String? roomName,
     String? inviterUid,
   }) {
-    final code = generateInviteCode(roomId);
+    final effectiveCode =
+        code ?? (roomId != null ? generateInviteCode(roomId) : 'PET9AB');
     final uri = Uri.parse(baseWebUrl).replace(
       queryParameters: {
-        'code': code,
-        'room': roomId,
+        'code': effectiveCode,
+        if (roomId != null && roomId.isNotEmpty) 'room': roomId,
         if (roomName != null && roomName.isNotEmpty) 'name': roomName,
         if (inviterUid != null && inviterUid.isNotEmpty) 'inviter': inviterUid,
       },
@@ -39,15 +41,17 @@ class InviteLinkService {
 
   /// Generates a deep link custom URI scheme for direct app invocation.
   static String buildCustomSchemeUrl({
-    required String roomId,
+    String? roomId,
+    String? code,
     String? roomName,
     String? inviterUid,
   }) {
-    final code = generateInviteCode(roomId);
+    final effectiveCode =
+        code ?? (roomId != null ? generateInviteCode(roomId) : 'PET9AB');
     final uri = Uri.parse(customSchemePrefix).replace(
       queryParameters: {
-        'code': code,
-        'room': roomId,
+        'code': effectiveCode,
+        if (roomId != null && roomId.isNotEmpty) 'room': roomId,
         if (roomName != null && roomName.isNotEmpty) 'name': roomName,
         if (inviterUid != null && inviterUid.isNotEmpty) 'inviter': inviterUid,
       },

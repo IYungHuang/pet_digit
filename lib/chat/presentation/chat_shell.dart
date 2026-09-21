@@ -27,6 +27,7 @@ import '../../user/presentation/widgets/contacts_dialog.dart';
 import '../../user/presentation/widgets/create_room_dialog.dart';
 import '../../user/presentation/widgets/my_pets_backpack_dialog.dart';
 import '../../user/presentation/widgets/onboarding_wizard_dialog.dart';
+import '../../user/presentation/widgets/room_members_dialog.dart';
 import '../../user/presentation/widgets/room_pet_summon_dialog.dart';
 import '../../user/presentation/widgets/user_profile_dialog.dart';
 import '../../pet/domain/pet_profile.dart';
@@ -556,15 +557,35 @@ class _ChatShellState extends ConsumerState<ChatShell> {
           ),
         ),
         titleSpacing: 10,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _room.name,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+        title: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => RoomMembersDialog.show(
+            context,
+            roomId: _activeRoomId,
+            roomName: _room.name,
+            onOpenRoom: _selectRoom,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _room.name,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.info_outline_rounded,
+                        size: 14, color: Color(0xff4361ee)),
+                  ],
+                ),
+                Text(_room.subtitle, style: Theme.of(context).textTheme.labelSmall),
+              ],
             ),
-            Text(_room.subtitle, style: Theme.of(context).textTheme.labelSmall),
-          ],
+          ),
         ),
         actions: [
           PopupMenuButton<String>(
@@ -1002,10 +1023,40 @@ class _RoomSelector extends StatelessWidget {
           );
         }
         final room = rooms[index];
+        final isDirect = room.id.startsWith('dm_');
+        final isSelected = room.id == activeRoomId;
         return ChoiceChip(
-          label: Text(room.name),
-          selected: room.id == activeRoomId,
-          onSelected: (_) => onSelected(room.id),
+          avatar: Icon(
+            isDirect ? Icons.chat_bubble_outline_rounded : Icons.groups_rounded,
+            size: 15,
+            color: isSelected
+                ? const Color(0xff4361ee)
+                : const Color(0xff6c757d),
+          ),
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(room.name),
+              if (isSelected) ...[
+                const SizedBox(width: 4),
+                const Icon(Icons.info_outline_rounded,
+                    size: 13, color: Color(0xff4361ee)),
+              ],
+            ],
+          ),
+          selected: isSelected,
+          onSelected: (_) {
+            if (isSelected) {
+              RoomMembersDialog.show(
+                context,
+                roomId: room.id,
+                roomName: room.name,
+                onOpenRoom: onSelected,
+              );
+            } else {
+              onSelected(room.id);
+            }
+          },
         );
       },
     ),

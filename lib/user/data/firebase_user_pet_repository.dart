@@ -73,6 +73,20 @@ class FirebaseUserPetRepository implements UserPetRepository {
   }
 
   @override
+  Future<void> addFriend(String targetUid) async {
+    try {
+      await _functions.httpsCallable('addFriend').call({'targetUid': targetUid});
+    } catch (_) {
+      // Ignored for offline/fallback
+    }
+  }
+
+  @override
+  Future<bool> isFriend(String targetUid) async {
+    return false;
+  }
+
+  @override
   Future<List<PetProfile>> getUserPets(String uid) async {
     final snapshot =
         await _firestore.collection('users').doc(uid).collection('pets').get();

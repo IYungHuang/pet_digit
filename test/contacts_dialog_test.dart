@@ -106,5 +106,50 @@ void main() {
 
       expect(openedRoomId, 'group_pet123');
     });
+
+    testWidgets('renders Phone Contacts tab and displays matched contacts', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            userPetRepositoryProvider.overrideWithValue(fakeRepo),
+            fakeUserPetRepositoryProvider.overrideWithValue(fakeRepo),
+          ],
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () => ContactsDialog.show(
+                  context,
+                  onOpenRoom: (_) {},
+                ),
+                child: const Text('Open Contacts'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Contacts'));
+      await tester.pumpAndSettle();
+
+      // Check phone contacts tab
+      expect(find.text('📱 手機通訊錄'), findsOneWidget);
+      await tester.tap(find.text('📱 手機通訊錄'));
+      await tester.pumpAndSettle();
+
+      // Should find header and seeded contact
+      expect(find.text('已自動比對手機通訊錄'), findsOneWidget);
+      expect(find.text('王大明 (波波夥伴)'), findsOneWidget);
+      expect(find.text('陳阿福 (柴犬阿福爸)'), findsOneWidget);
+      expect(find.text('加好友'), findsWidgets);
+
+      // Scroll to find unregistered contact
+      await tester.scrollUntilVisible(
+        find.text('李經理'),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.text('李經理'), findsOneWidget);
+      expect(find.text('邀請'), findsWidgets);
+    });
   });
 }

@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../chat/domain/room_summary.dart';
 import '../../../common/services/invite_link_service.dart';
+import '../../data/phone_contacts_service.dart';
 import '../../data/user_pet_repository.dart';
+import '../../domain/phone_contact.dart';
 import '../user_pet_providers.dart';
 
 class ContactsDialog extends ConsumerStatefulWidget {
@@ -37,15 +39,19 @@ class _ContactsDialogState extends ConsumerState<ContactsDialog>
 
   List<UserSearchResult> _friends = [];
   List<UserSearchResult> _searchResults = [];
+  List<PhoneContact> _phoneContacts = [];
   bool _loading = false;
+  bool _loadingPhoneContacts = false;
+  String _phoneFilter = 'all';
   String? _errorMessage;
   String? _successMessage;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadInitialFriends();
+    _syncPhoneContacts();
   }
 
   @override
@@ -150,6 +156,58 @@ class _ContactsDialogState extends ConsumerState<ContactsDialog>
     });
   }
 
+  Future<void> _syncPhoneContacts() async {
+    setState(() => _loadingPhoneContacts = true);
+    try {
+      final service = ref.read(phoneContactsServiceProvider);
+      final repo = ref.read(userPetRepositoryProvider);
+      final synced = await service.syncAndMatch(repository: repo);
+      if (mounted) {
+        setState(() {
+          _phoneContacts = synced;
+          _loadingPhoneContacts = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingPhoneContacts = false);
+    }
+  }
+
+  Future<void> _addFriendFromContact(PhoneContact contact) async {
+    if (contact.registeredUid == null) return;
+    setState(() => _loading = true);
+    try {
+      final repo = ref.read(userPetRepositoryProvider);
+      await repo.addFriend(contact.registeredUid!);
+      await _loadInitialFriends();
+      await _syncPhoneContacts();
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _successMessage = '已成功將 ${contact.name} 加為好友！';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = '加好友失敗：$e';
+        });
+      }
+    }
+  }
+
+  void _invitePhoneContact(PhoneContact contact) {
+    final text = PhoneContactsService.buildSmsInviteText(
+      contactName: contact.name,
+      myInviteCode: 'PET9AB',
+    );
+    Clipboard.setData(ClipboardData(text: text));
+    setState(() {
+      _successMessage = '已複製邀請簡訊！可直接貼上傳送給 ${contact.name}';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -221,6 +279,7 @@ class _ContactsDialogState extends ConsumerState<ContactsDialog>
                 labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                 tabs: const [
                   Tab(text: '👥 好友名單'),
+                  Tab(text: '📱 手機通訊錄'),
                   Tab(text: '🔍 搜尋加好友'),
                   Tab(text: '🎟️ 邀請碼 / 連結'),
                 ],
@@ -256,10 +315,13 @@ class _ContactsDialogState extends ConsumerState<ContactsDialog>
                     // Tab 1: Friends
                     _buildFriendsTab(),
 
-                    // Tab 2: Search
+                    // Tab 2: Phone Contacts (TG style)
+                    _buildPhoneContactsTab(),
+
+                    // Tab 3: Search
                     _buildSearchTab(),
 
-                    // Tab 3: Invite Code & Deeplink
+                    // Tab 4: Invite Code & Deeplink
                     _buildInviteCodeTab(),
                   ],
                 ),
@@ -372,6 +434,276 @@ class _ContactsDialogState extends ConsumerState<ContactsDialog>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildPhoneContactsTab() {
+    if (_loadingPhoneContacts && _phoneContacts.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final filtered = switch (_phoneFilter) {
+      'registered' => _phoneContacts.where((c) => c.isRegistered).toList(),
+      'unregistered' => _phoneContacts.where((c) => !c.isRegistered).toList(),
+      _ => _phoneContacts,
+    };
+
+    final registeredCount = _phoneContacts.where((c) => c.isRegistered).length;
+    final unregisteredCount =
+        _phoneContacts.where((c) => !c.isRegistered).length;
+
+    return Column(
+      children: [
+        // Top Card: Telegram style phonebook sync header
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xffeef2ff), Color(0xfff0fdf4)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xffdbeafe)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text('📲', style: TextStyle(fontSize: 18)),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      '已自動比對手機通訊錄',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: Color(0xff1e3a8a),
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: _syncPhoneContacts,
+                    borderRadius: BorderRadius.circular(20),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.refresh_rounded,
+                          size: 18, color: Color(0xff4361ee)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '像 Telegram 一樣自動尋找通訊錄中的好友，直接開啟私聊或傳送邀請！',
+                style: TextStyle(fontSize: 11, color: Color(0xff4b5563)),
+              ),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildPhoneFilterChip('all', '全部 (${_phoneContacts.length})'),
+                    const SizedBox(width: 6),
+                    _buildPhoneFilterChip('registered', '🌟 已加入 ($registeredCount)'),
+                    const SizedBox(width: 6),
+                    _buildPhoneFilterChip('unregistered', '✉️ 待邀請 ($unregisteredCount)'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Contacts list
+        Expanded(
+          child: filtered.isEmpty
+              ? const Center(
+                  child: Text('無符合條件的通訊錄聯絡人',
+                      style: TextStyle(color: Color(0xff6c757d))),
+                )
+              : ListView.separated(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final contact = filtered[index];
+                    return _buildPhoneContactTile(contact);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhoneFilterChip(String filterKey, String label) {
+    final isSelected = _phoneFilter == filterKey;
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => setState(() => _phoneFilter = filterKey),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xff4361ee) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xff4361ee)
+                : const Color(0xffcbd5e1),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? Colors.white : const Color(0xff475569),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhoneContactTile(PhoneContact contact) {
+    return Container(
+      decoration: BoxDecoration(
+        color: contact.isRegistered
+            ? const Color(0xfff8faff)
+            : const Color(0xfffcfcfd),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: contact.isRegistered
+              ? const Color(0xffc7d2fe)
+              : const Color(0xffe9ecef),
+        ),
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          radius: 20,
+          backgroundColor: contact.isRegistered
+              ? const Color(0xffeff2fe)
+              : const Color(0xfff1f3f5),
+          child: Text(
+            contact.name.isNotEmpty ? contact.name[0] : '聯',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: contact.isRegistered
+                  ? const Color(0xff4361ee)
+                  : const Color(0xff6c757d),
+            ),
+          ),
+        ),
+        title: Text(
+          contact.name,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+        subtitle: contact.isRegistered
+            ? Wrap(
+                spacing: 6,
+                runSpacing: 2,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    '暱稱：${contact.registeredNickname}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xff1e3a8a),
+                    ),
+                  ),
+                  if (contact.defaultPetName != null)
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xffeff2fe),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '🐾 ${contact.defaultPetName}',
+                        style: const TextStyle(
+                            fontSize: 10, color: Color(0xff4361ee)),
+                      ),
+                    ),
+                ],
+              )
+            : Text(
+                '電話：${contact.phoneNumber}',
+                style: const TextStyle(fontSize: 11, color: Color(0xff6c757d)),
+              ),
+        trailing: contact.isRegistered
+            ? (contact.isFriend
+                ? ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xff4361ee),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    onPressed: () =>
+                        _startDirectChat(contact.registeredUid!),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.chat_bubble_outline_rounded, size: 14),
+                        SizedBox(width: 4),
+                        Text('私聊',
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  )
+                : OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xff4361ee),
+                      side: const BorderSide(color: Color(0xff4361ee)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    onPressed: () => _addFriendFromContact(contact),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.person_add_rounded, size: 14),
+                        SizedBox(width: 4),
+                        Text('加好友',
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ))
+            : ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xff10b981),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: () => _invitePhoneContact(contact),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.mail_outline_rounded, size: 14),
+                    SizedBox(width: 4),
+                    Text('邀請',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+      ),
     );
   }
 
