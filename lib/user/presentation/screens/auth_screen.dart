@@ -919,20 +919,20 @@ class _ThirdPartyConnectedPetDialogState
                 const SizedBox(height: 14),
 
                 // 4. Species selector
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
                     ChoiceChip(
                       label: const Text('🐕 狗狗'),
                       selected: _selectedSpecies == PetSpecies.dog,
                       onSelected: (_) => _onSpecies(PetSpecies.dog),
                     ),
-                    const SizedBox(width: 8),
                     ChoiceChip(
                       label: const Text('🐱 貓咪'),
                       selected: _selectedSpecies == PetSpecies.cat,
                       onSelected: (_) => _onSpecies(PetSpecies.cat),
                     ),
-                    const SizedBox(width: 8),
                     ChoiceChip(
                       label: const Text('🦜 鸚鵡'),
                       selected: _selectedSpecies == PetSpecies.parrot,
@@ -1001,12 +1001,14 @@ class _ThirdPartyConnectedPetDialogState
                 const SizedBox(height: 10),
 
                 // 7. Gender
-                Row(
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
                     const Text('性別：',
                         style: TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w600)),
-                    const SizedBox(width: 4),
                     ChoiceChip(
                       label: const Text('♂ 公', style: TextStyle(fontSize: 11)),
                       selected: _selectedGender == PetGender.male,
@@ -1014,7 +1016,6 @@ class _ThirdPartyConnectedPetDialogState
                           setState(() => _selectedGender = PetGender.male),
                       visualDensity: VisualDensity.compact,
                     ),
-                    const SizedBox(width: 6),
                     ChoiceChip(
                       label: const Text('♀ 母', style: TextStyle(fontSize: 11)),
                       selected: _selectedGender == PetGender.female,
@@ -1022,7 +1023,6 @@ class _ThirdPartyConnectedPetDialogState
                           setState(() => _selectedGender = PetGender.female),
                       visualDensity: VisualDensity.compact,
                     ),
-                    const SizedBox(width: 6),
                     ChoiceChip(
                       label:
                           const Text('✂️ 結紮', style: TextStyle(fontSize: 11)),

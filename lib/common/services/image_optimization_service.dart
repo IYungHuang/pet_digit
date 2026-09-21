@@ -198,7 +198,7 @@ class ImageOptimizationService {
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 subtitle: const Text(
-                  '開啟相機鏡頭，拍攝家中毛孩生活照',
+                  '開啟相機鏡頭，拍攝家中寵物生活照',
                   style: TextStyle(fontSize: 12, color: Color(0xff6c757d)),
                 ),
                 shape: RoundedRectangleBorder(

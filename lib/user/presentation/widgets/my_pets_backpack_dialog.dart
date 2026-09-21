@@ -63,7 +63,7 @@ class _MyPetsBackpackDialogState extends ConsumerState<MyPetsBackpackDialog> {
       final image = await service.showImageSourcePickerAndPick(
         context,
         preset: ImageOptimizationPreset.galleryPhoto,
-        title: '上傳毛孩生活照',
+        title: '上傳寵物生活照',
       );
       if (image != null && mounted) {
         setState(() {
