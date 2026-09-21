@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$PetProfile {
 
- String get petId; String get ownerUid; String get name; PetSpecies get species; String get breed; String get avatarUrl; PetGender get gender; String get personality;@FlexibleNullableDateTimeConverter() DateTime? get birthday;@FlexibleDateTimeConverter() DateTime get createdAt;@FlexibleDateTimeConverter() DateTime get updatedAt;
+ String get petId; String get ownerUid; String get name; PetSpecies get species; String get breed; String get avatarUrl; List<String> get photoUrls; PetGender get gender; String get personality;@FlexibleNullableDateTimeConverter() DateTime? get birthday;@FlexibleDateTimeConverter() DateTime get createdAt;@FlexibleDateTimeConverter() DateTime get updatedAt;
 /// Create a copy of PetProfile
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $PetProfileCopyWith<PetProfile> get copyWith => _$PetProfileCopyWithImpl<PetProf
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is PetProfile&&(identical(other.petId, petId) || other.petId == petId)&&(identical(other.ownerUid, ownerUid) || other.ownerUid == ownerUid)&&(identical(other.name, name) || other.name == name)&&(identical(other.species, species) || other.species == species)&&(identical(other.breed, breed) || other.breed == breed)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.personality, personality) || other.personality == personality)&&(identical(other.birthday, birthday) || other.birthday == birthday)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PetProfile&&(identical(other.petId, petId) || other.petId == petId)&&(identical(other.ownerUid, ownerUid) || other.ownerUid == ownerUid)&&(identical(other.name, name) || other.name == name)&&(identical(other.species, species) || other.species == species)&&(identical(other.breed, breed) || other.breed == breed)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&const DeepCollectionEquality().equals(other.photoUrls, photoUrls)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.personality, personality) || other.personality == personality)&&(identical(other.birthday, birthday) || other.birthday == birthday)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,petId,ownerUid,name,species,breed,avatarUrl,gender,personality,birthday,createdAt,updatedAt);
+int get hashCode => Object.hash(runtimeType,petId,ownerUid,name,species,breed,avatarUrl,const DeepCollectionEquality().hash(photoUrls),gender,personality,birthday,createdAt,updatedAt);
 
 @override
 String toString() {
-  return 'PetProfile(petId: $petId, ownerUid: $ownerUid, name: $name, species: $species, breed: $breed, avatarUrl: $avatarUrl, gender: $gender, personality: $personality, birthday: $birthday, createdAt: $createdAt, updatedAt: $updatedAt)';
+  return 'PetProfile(petId: $petId, ownerUid: $ownerUid, name: $name, species: $species, breed: $breed, avatarUrl: $avatarUrl, photoUrls: $photoUrls, gender: $gender, personality: $personality, birthday: $birthday, createdAt: $createdAt, updatedAt: $updatedAt)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $PetProfileCopyWith<$Res>  {
   factory $PetProfileCopyWith(PetProfile value, $Res Function(PetProfile) _then) = _$PetProfileCopyWithImpl;
 @useResult
 $Res call({
- String petId, String ownerUid, String name, PetSpecies species, String breed, String avatarUrl, PetGender gender, String personality,@FlexibleNullableDateTimeConverter() DateTime? birthday,@FlexibleDateTimeConverter() DateTime createdAt,@FlexibleDateTimeConverter() DateTime updatedAt
+ String petId, String ownerUid, String name, PetSpecies species, String breed, String avatarUrl, List<String> photoUrls, PetGender gender, String personality,@FlexibleNullableDateTimeConverter() DateTime? birthday,@FlexibleDateTimeConverter() DateTime createdAt,@FlexibleDateTimeConverter() DateTime updatedAt
 });
 
 
@@ -65,7 +65,7 @@ class _$PetProfileCopyWithImpl<$Res>
 
 /// Create a copy of PetProfile
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? petId = null,Object? ownerUid = null,Object? name = null,Object? species = null,Object? breed = null,Object? avatarUrl = null,Object? gender = null,Object? personality = null,Object? birthday = freezed,Object? createdAt = null,Object? updatedAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? petId = null,Object? ownerUid = null,Object? name = null,Object? species = null,Object? breed = null,Object? avatarUrl = null,Object? photoUrls = null,Object? gender = null,Object? personality = null,Object? birthday = freezed,Object? createdAt = null,Object? updatedAt = null,}) {
   return _then(_self.copyWith(
 petId: null == petId ? _self.petId : petId // ignore: cast_nullable_to_non_nullable
 as String,ownerUid: null == ownerUid ? _self.ownerUid : ownerUid // ignore: cast_nullable_to_non_nullable
@@ -73,7 +73,8 @@ as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non
 as String,species: null == species ? _self.species : species // ignore: cast_nullable_to_non_nullable
 as PetSpecies,breed: null == breed ? _self.breed : breed // ignore: cast_nullable_to_non_nullable
 as String,avatarUrl: null == avatarUrl ? _self.avatarUrl : avatarUrl // ignore: cast_nullable_to_non_nullable
-as String,gender: null == gender ? _self.gender : gender // ignore: cast_nullable_to_non_nullable
+as String,photoUrls: null == photoUrls ? _self.photoUrls : photoUrls // ignore: cast_nullable_to_non_nullable
+as List<String>,gender: null == gender ? _self.gender : gender // ignore: cast_nullable_to_non_nullable
 as PetGender,personality: null == personality ? _self.personality : personality // ignore: cast_nullable_to_non_nullable
 as String,birthday: freezed == birthday ? _self.birthday : birthday // ignore: cast_nullable_to_non_nullable
 as DateTime?,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
@@ -163,10 +164,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String petId,  String ownerUid,  String name,  PetSpecies species,  String breed,  String avatarUrl,  PetGender gender,  String personality, @FlexibleNullableDateTimeConverter()  DateTime? birthday, @FlexibleDateTimeConverter()  DateTime createdAt, @FlexibleDateTimeConverter()  DateTime updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String petId,  String ownerUid,  String name,  PetSpecies species,  String breed,  String avatarUrl,  List<String> photoUrls,  PetGender gender,  String personality, @FlexibleNullableDateTimeConverter()  DateTime? birthday, @FlexibleDateTimeConverter()  DateTime createdAt, @FlexibleDateTimeConverter()  DateTime updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _PetProfile() when $default != null:
-return $default(_that.petId,_that.ownerUid,_that.name,_that.species,_that.breed,_that.avatarUrl,_that.gender,_that.personality,_that.birthday,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.petId,_that.ownerUid,_that.name,_that.species,_that.breed,_that.avatarUrl,_that.photoUrls,_that.gender,_that.personality,_that.birthday,_that.createdAt,_that.updatedAt);case _:
   return orElse();
 
 }
@@ -184,10 +185,10 @@ return $default(_that.petId,_that.ownerUid,_that.name,_that.species,_that.breed,
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String petId,  String ownerUid,  String name,  PetSpecies species,  String breed,  String avatarUrl,  PetGender gender,  String personality, @FlexibleNullableDateTimeConverter()  DateTime? birthday, @FlexibleDateTimeConverter()  DateTime createdAt, @FlexibleDateTimeConverter()  DateTime updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String petId,  String ownerUid,  String name,  PetSpecies species,  String breed,  String avatarUrl,  List<String> photoUrls,  PetGender gender,  String personality, @FlexibleNullableDateTimeConverter()  DateTime? birthday, @FlexibleDateTimeConverter()  DateTime createdAt, @FlexibleDateTimeConverter()  DateTime updatedAt)  $default,) {final _that = this;
 switch (_that) {
 case _PetProfile():
-return $default(_that.petId,_that.ownerUid,_that.name,_that.species,_that.breed,_that.avatarUrl,_that.gender,_that.personality,_that.birthday,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.petId,_that.ownerUid,_that.name,_that.species,_that.breed,_that.avatarUrl,_that.photoUrls,_that.gender,_that.personality,_that.birthday,_that.createdAt,_that.updatedAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -204,10 +205,10 @@ return $default(_that.petId,_that.ownerUid,_that.name,_that.species,_that.breed,
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String petId,  String ownerUid,  String name,  PetSpecies species,  String breed,  String avatarUrl,  PetGender gender,  String personality, @FlexibleNullableDateTimeConverter()  DateTime? birthday, @FlexibleDateTimeConverter()  DateTime createdAt, @FlexibleDateTimeConverter()  DateTime updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String petId,  String ownerUid,  String name,  PetSpecies species,  String breed,  String avatarUrl,  List<String> photoUrls,  PetGender gender,  String personality, @FlexibleNullableDateTimeConverter()  DateTime? birthday, @FlexibleDateTimeConverter()  DateTime createdAt, @FlexibleDateTimeConverter()  DateTime updatedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _PetProfile() when $default != null:
-return $default(_that.petId,_that.ownerUid,_that.name,_that.species,_that.breed,_that.avatarUrl,_that.gender,_that.personality,_that.birthday,_that.createdAt,_that.updatedAt);case _:
+return $default(_that.petId,_that.ownerUid,_that.name,_that.species,_that.breed,_that.avatarUrl,_that.photoUrls,_that.gender,_that.personality,_that.birthday,_that.createdAt,_that.updatedAt);case _:
   return null;
 
 }
@@ -219,7 +220,7 @@ return $default(_that.petId,_that.ownerUid,_that.name,_that.species,_that.breed,
 @JsonSerializable()
 
 class _PetProfile implements PetProfile {
-  const _PetProfile({required this.petId, required this.ownerUid, required this.name, required this.species, required this.breed, required this.avatarUrl, this.gender = PetGender.unknown, this.personality = 'playful', @FlexibleNullableDateTimeConverter() this.birthday, @FlexibleDateTimeConverter() required this.createdAt, @FlexibleDateTimeConverter() required this.updatedAt});
+  const _PetProfile({required this.petId, required this.ownerUid, required this.name, required this.species, required this.breed, required this.avatarUrl, final  List<String> photoUrls = const [], this.gender = PetGender.unknown, this.personality = 'playful', @FlexibleNullableDateTimeConverter() this.birthday, @FlexibleDateTimeConverter() required this.createdAt, @FlexibleDateTimeConverter() required this.updatedAt}): _photoUrls = photoUrls;
   factory _PetProfile.fromJson(Map<String, dynamic> json) => _$PetProfileFromJson(json);
 
 @override final  String petId;
@@ -228,6 +229,13 @@ class _PetProfile implements PetProfile {
 @override final  PetSpecies species;
 @override final  String breed;
 @override final  String avatarUrl;
+ final  List<String> _photoUrls;
+@override@JsonKey() List<String> get photoUrls {
+  if (_photoUrls is EqualUnmodifiableListView) return _photoUrls;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_photoUrls);
+}
+
 @override@JsonKey() final  PetGender gender;
 @override@JsonKey() final  String personality;
 @override@FlexibleNullableDateTimeConverter() final  DateTime? birthday;
@@ -247,16 +255,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PetProfile&&(identical(other.petId, petId) || other.petId == petId)&&(identical(other.ownerUid, ownerUid) || other.ownerUid == ownerUid)&&(identical(other.name, name) || other.name == name)&&(identical(other.species, species) || other.species == species)&&(identical(other.breed, breed) || other.breed == breed)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.personality, personality) || other.personality == personality)&&(identical(other.birthday, birthday) || other.birthday == birthday)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PetProfile&&(identical(other.petId, petId) || other.petId == petId)&&(identical(other.ownerUid, ownerUid) || other.ownerUid == ownerUid)&&(identical(other.name, name) || other.name == name)&&(identical(other.species, species) || other.species == species)&&(identical(other.breed, breed) || other.breed == breed)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&const DeepCollectionEquality().equals(other._photoUrls, _photoUrls)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.personality, personality) || other.personality == personality)&&(identical(other.birthday, birthday) || other.birthday == birthday)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,petId,ownerUid,name,species,breed,avatarUrl,gender,personality,birthday,createdAt,updatedAt);
+int get hashCode => Object.hash(runtimeType,petId,ownerUid,name,species,breed,avatarUrl,const DeepCollectionEquality().hash(_photoUrls),gender,personality,birthday,createdAt,updatedAt);
 
 @override
 String toString() {
-  return 'PetProfile(petId: $petId, ownerUid: $ownerUid, name: $name, species: $species, breed: $breed, avatarUrl: $avatarUrl, gender: $gender, personality: $personality, birthday: $birthday, createdAt: $createdAt, updatedAt: $updatedAt)';
+  return 'PetProfile(petId: $petId, ownerUid: $ownerUid, name: $name, species: $species, breed: $breed, avatarUrl: $avatarUrl, photoUrls: $photoUrls, gender: $gender, personality: $personality, birthday: $birthday, createdAt: $createdAt, updatedAt: $updatedAt)';
 }
 
 
@@ -267,7 +275,7 @@ abstract mixin class _$PetProfileCopyWith<$Res> implements $PetProfileCopyWith<$
   factory _$PetProfileCopyWith(_PetProfile value, $Res Function(_PetProfile) _then) = __$PetProfileCopyWithImpl;
 @override @useResult
 $Res call({
- String petId, String ownerUid, String name, PetSpecies species, String breed, String avatarUrl, PetGender gender, String personality,@FlexibleNullableDateTimeConverter() DateTime? birthday,@FlexibleDateTimeConverter() DateTime createdAt,@FlexibleDateTimeConverter() DateTime updatedAt
+ String petId, String ownerUid, String name, PetSpecies species, String breed, String avatarUrl, List<String> photoUrls, PetGender gender, String personality,@FlexibleNullableDateTimeConverter() DateTime? birthday,@FlexibleDateTimeConverter() DateTime createdAt,@FlexibleDateTimeConverter() DateTime updatedAt
 });
 
 
@@ -284,7 +292,7 @@ class __$PetProfileCopyWithImpl<$Res>
 
 /// Create a copy of PetProfile
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? petId = null,Object? ownerUid = null,Object? name = null,Object? species = null,Object? breed = null,Object? avatarUrl = null,Object? gender = null,Object? personality = null,Object? birthday = freezed,Object? createdAt = null,Object? updatedAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? petId = null,Object? ownerUid = null,Object? name = null,Object? species = null,Object? breed = null,Object? avatarUrl = null,Object? photoUrls = null,Object? gender = null,Object? personality = null,Object? birthday = freezed,Object? createdAt = null,Object? updatedAt = null,}) {
   return _then(_PetProfile(
 petId: null == petId ? _self.petId : petId // ignore: cast_nullable_to_non_nullable
 as String,ownerUid: null == ownerUid ? _self.ownerUid : ownerUid // ignore: cast_nullable_to_non_nullable
@@ -292,7 +300,8 @@ as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non
 as String,species: null == species ? _self.species : species // ignore: cast_nullable_to_non_nullable
 as PetSpecies,breed: null == breed ? _self.breed : breed // ignore: cast_nullable_to_non_nullable
 as String,avatarUrl: null == avatarUrl ? _self.avatarUrl : avatarUrl // ignore: cast_nullable_to_non_nullable
-as String,gender: null == gender ? _self.gender : gender // ignore: cast_nullable_to_non_nullable
+as String,photoUrls: null == photoUrls ? _self._photoUrls : photoUrls // ignore: cast_nullable_to_non_nullable
+as List<String>,gender: null == gender ? _self.gender : gender // ignore: cast_nullable_to_non_nullable
 as PetGender,personality: null == personality ? _self.personality : personality // ignore: cast_nullable_to_non_nullable
 as String,birthday: freezed == birthday ? _self.birthday : birthday // ignore: cast_nullable_to_non_nullable
 as DateTime?,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable

@@ -45,6 +45,7 @@ abstract class PetProfile with _$PetProfile {
     required PetSpecies species,
     required String breed,
     required String avatarUrl,
+    @Default([]) List<String> photoUrls,
     @Default(PetGender.unknown) PetGender gender,
     @Default('playful') String personality,
     @FlexibleNullableDateTimeConverter() DateTime? birthday,

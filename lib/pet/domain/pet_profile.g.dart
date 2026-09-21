@@ -13,6 +13,9 @@ _PetProfile _$PetProfileFromJson(Map<String, dynamic> json) => _PetProfile(
   species: $enumDecode(_$PetSpeciesEnumMap, json['species']),
   breed: json['breed'] as String,
   avatarUrl: json['avatarUrl'] as String,
+  photoUrls:
+      (json['photoUrls'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      const [],
   gender:
       $enumDecodeNullable(_$PetGenderEnumMap, json['gender']) ??
       PetGender.unknown,
@@ -32,6 +35,7 @@ Map<String, dynamic> _$PetProfileToJson(_PetProfile instance) =>
       'species': _$PetSpeciesEnumMap[instance.species]!,
       'breed': instance.breed,
       'avatarUrl': instance.avatarUrl,
+      'photoUrls': instance.photoUrls,
       'gender': _$PetGenderEnumMap[instance.gender]!,
       'personality': instance.personality,
       'birthday': const FlexibleNullableDateTimeConverter().toJson(
